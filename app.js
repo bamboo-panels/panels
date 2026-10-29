@@ -1,8 +1,8 @@
 // Initialize Lucide Icons
 lucide.createIcons();
 
-// State Management
-let specimenHistory = [];
+// State Management (Load from localStorage if available)
+let specimenHistory = JSON.parse(localStorage.getItem('acoustic_specimen_history')) || [];
 let currentTestData = {
     name: "Bamboo Panel (1A)",
     frequencies: [250, 500, 1000, 2000, 3150, 4000, 5000],
@@ -30,6 +30,15 @@ function calculateDensity() {
 
     // Update material density field
     document.getElementById('materialDensity').value = Math.round(density);
+}
+
+// Live update specimen name on chart and header as you type
+function updateSpecimenNameLabel() {
+    const name = document.getElementById('specimenInput').value;
+    document.getElementById('currentActiveLabel').innerText = `Viewing: ${name}`;
+    currentTestData.name = name;
+    absorptionChart.data.datasets[0].label = name;
+    absorptionChart.update();
 }
 
 // Chart Initialization
@@ -107,7 +116,7 @@ function runTestSimulation() {
     updateRawDataTable();
 }
 
-// Save current test to sidebar history
+// Save current test to sidebar history & localStorage
 function saveCurrentTest() {
     const newRecord = {
         id: Date.now(),
@@ -117,6 +126,10 @@ function saveCurrentTest() {
         absorption: [...currentTestData.absorption]
     };
     specimenHistory.unshift(newRecord);
+    
+    // Save to browser Local Storage
+    localStorage.setItem('acoustic_specimen_history', JSON.stringify(specimenHistory));
+    
     renderHistorySidebar();
 }
 
@@ -176,7 +189,7 @@ function loadRecord(id) {
     updateRawDataTable();
 }
 
-// Rename specimen in history
+// Rename specimen in history & update localStorage
 function renameRecord(id) {
     const record = specimenHistory.find(r => r.id === id);
     if (!record) return;
@@ -184,16 +197,19 @@ function renameRecord(id) {
     const newName = prompt("Enter new name for this specimen:", record.name);
     if (newName && newName.trim() !== "") {
         record.name = newName.trim();
-        if (currentTestData.name === record.name) {
+        if (currentTestData.name === record.name || document.getElementById('specimenInput').value === record.name) {
             document.getElementById('specimenInput').value = record.name;
+            updateSpecimenNameLabel();
         }
+        localStorage.setItem('acoustic_specimen_history', JSON.stringify(specimenHistory));
         renderHistorySidebar();
     }
 }
 
-// Delete record from history
+// Delete record from history & update localStorage
 function deleteRecord(id) {
     specimenHistory = specimenHistory.filter(r => r.id !== id);
+    localStorage.setItem('acoustic_specimen_history', JSON.stringify(specimenHistory));
     renderHistorySidebar();
 }
 
@@ -215,3 +231,4 @@ function exportCSV() {
 // Initial setup
 calculateDensity();
 updateRawDataTable();
+renderHistorySidebar();
