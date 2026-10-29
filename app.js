@@ -4,7 +4,7 @@ lucide.createIcons();
 // State Management (Load from localStorage if available)
 let specimenHistory = JSON.parse(localStorage.getItem('acoustic_specimen_history')) || [];
 let currentTestData = {
-    name: "Bamboo Panel (1A)",
+    name: "Bamboo Panel",
     frequencies: [250, 500, 1000, 2000, 3150, 4000, 5000],
     absorption: [0.12, 0.38, 0.72, 0.91, 0.85, 0.79, 0.72]
 };
