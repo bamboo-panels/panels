@@ -100,7 +100,7 @@ function renderChart(freqs, alpha) {
     data: {
       labels: freqs,
       datasets: [{
-        label: 'Bambusa vulgaris Panel Absorption (α)',
+        label: 'Bamboo Panel Absorption (α)',
         data: alpha,
         borderColor: '#2e7d32',
         backgroundColor: 'rgba(46, 125, 50, 0.1)',
