@@ -1,142 +1,331 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bambusa vulgaris Acoustic Analysis Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    :root {
-      --primary: #4caf50;
-      --primary-dark: #2e7d32;
-      --bg: #121212;          /* Deep black background */
-      --card-bg: #1e1e1e;     /* Charcoal dark card background */
-      --text: #e0e0e0;        /* Light grey text for high contrast */
-      --text-muted: #a0a0a0;
-      --border-color: #333333;
-    }
-    body {
-      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: var(--bg);
-      color: var(--text);
-      margin: 0;
-      padding: 20px;
-    }
-    .container {
-      max-width: 1100px;
-      margin: 0 auto;
-    }
-    header {
-      background: linear-gradient(135deg, #1b5e20, #000000);
-      color: #ffffff;
-      padding: 25px;
-      border-radius: 10px;
-      margin-bottom: 25px;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-    }
-    header h1 {
-      margin: 0 0 10px 0;
-      font-size: 1.8rem;
-      color: #81c784;
-    }
-    header p {
-      margin: 0;
-      opacity: 0.85;
-    }
-    .control-panel, .results-panel, .chart-card {
-      background: var(--card-bg);
-      padding: 20px;
-      border-radius: 10px;
-      margin-bottom: 20px;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 15px;
-      margin-top: 15px;
-    }
-    .metric-card {
-      background: #18281a;
-      padding: 15px;
-      border-radius: 8px;
-      border-left: 5px solid var(--primary);
-    }
-    .metric-title {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      font-weight: bold;
-      text-transform: uppercase;
-    }
-    .metric-value {
-      font-size: 1.4rem;
-      font-weight: bold;
-      color: #81c784;
-      margin-top: 5px;
-    }
-    .file-input {
-      margin-top: 10px;
-      padding: 12px;
-      border: 2px dashed #444;
-      border-radius: 8px;
-      width: 100%;
-      box-sizing: border-box;
-      background: #252525;
-      color: var(--text);
-    }
-    .file-input:hover {
-      border-color: var(--primary);
-    }
-    canvas {
-      max-width: 100%;
-      height: 400px !important;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DIY Impedance Tube - Acoustic Panel Testing Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen flex flex-col">
 
-<div class="container">
-  <header>
-    <h1>Bamboo Panel Acoustic Characterization</h1>
-    <p>Normal Incidence Sound Absorption & Time-of-Flight Analysis (ASTM E1050)</p>
-  </header>
+    <!-- Top Navigation -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-indigo-600 rounded-lg text-white">
+                    <i data-lucide="waves" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-white tracking-wide">AcousticLab <span class="text-indigo-400 font-normal text-sm">| DIY Impedance Tube</span></h1>
+                    <p class="text-xs text-slate-400">Normal-Incidence Sound Absorption Coefficient ($\alpha$) Testing</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="saveCurrentTest()" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-lg shadow-indigo-600/20">
+                    <i data-lucide="save" class="w-4 h-4"></i>
+                    <span>Save to History</span>
+                </button>
+            </div>
+        </div>
+    </header>
 
-  <div class="control-panel">
-    <h3>Upload File</h3>
-    <p style="color: var(--text-muted);">Select your 2-channel stereo <code>.wav</code> file captured from the impedance tube:</p>
-    <input type="file" id="audioFile" accept=".wav" class="file-input">
-  </div>
+    <!-- Main Layout Grid -->
+    <div class="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto p-4 gap-6">
 
-  <div class="results-panel">
-    <h3>Experimental Metrics</h3>
-    <div class="grid">
-      <div class="metric-card">
-        <div class="metric-title">Mean Absorption (250-2000 Hz)</div>
-        <div class="metric-value" id="meanAlpha">--</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-title">Measured Delay (Mic 1 → Mic 2)</div>
-        <div class="metric-value" id="timeDelay">-- ms</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-title">Time of Flight (Mic 2 → Panel)</div>
-        <div class="metric-value" id="tofPanel">0.2915 ms</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-title">Sampling Rate</div>
-        <div class="metric-value" id="sampleRate">-- Hz</div>
-      </div>
+        <!-- Left Column: Controls & Raw Data Panel -->
+        <div class="w-full md:w-80 flex flex-col gap-6">
+            <!-- Parameter Controls -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
+                <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <i data-lucide="sliders" class="w-4 h-4 text-indigo-400"></i> Tube Parameters
+                </h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">Specimen Name</label>
+                        <input type="text" id="specimenInput" value="Coconut Coir - 20mm" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">Tube Diameter ($d$)</label>
+                        <select id="tubeDiameter" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <option value="100">100 mm (Low Frequency)</option>
+                            <option value="30" selected>30 mm (High Frequency)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">Material Density (kg/m³)</label>
+                        <input type="number" id="materialDensity" value="120" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <button onclick="runTestSimulation()" class="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-slate-200 py-2.5 rounded-lg text-sm font-medium transition border border-slate-700 flex items-center justify-center gap-2">
+                        <i data-lucide="play" class="w-4 h-4 text-emerald-400"></i> Run Measurement
+                    </button>
+                </div>
+            </div>
+
+            <!-- Raw Data Previewer -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex-1 flex flex-col">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-indigo-400"></i> Raw Data
+                    </h2>
+                    <button onclick="exportCSV()" class="text-xs text-indigo-400 hover:underline flex items-center gap-1">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="bg-slate-950 border border-slate-800 rounded-lg p-2 h-48 overflow-y-auto font-mono text-xs text-slate-400">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="border-b border-slate-800 text-slate-500">
+                                <th class="p-1">Freq (Hz)</th>
+                                <th class="p-1">Alpha ($\alpha$)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rawDataTable">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center/Right Area: Chart & Specimen History Sidebar -->
+        <div class="flex-1 flex flex-col lg:flex-row gap-6">
+            
+            <!-- Graph Section -->
+            <div class="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-base font-bold text-white">Sound Absorption Spectrum</h2>
+                        <p class="text-xs text-slate-400" id="currentActiveLabel">Viewing: Coconut Coir - 20mm</p>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-slate-400 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+                        <span class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                        <span>ISO 10534-2 Method</span>
+                    </div>
+                </div>
+                <div class="flex-1 relative min-h-[350px]">
+                    <canvas id="absorptionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Specimen History Sidebar -->
+            <div class="w-full lg:w-80 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                        <i data-lucide="history" class="w-4 h-4 text-indigo-400"></i> Specimen History
+                    </h2>
+                    <span id="historyCount" class="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">0 saved</span>
+                </div>
+                <div class="flex-1 overflow-y-auto space-y-3 max-h-[450px]" id="historyList">
+                    <p class="text-xs text-slate-500 text-center py-8">No saved specimens yet. Run a test and click "Save to History".</p>
+                </div>
+            </div>
+
+        </div>
+
     </div>
-  </div>
 
-  <div class="chart-card">
-    <h3>Sound Absorption Coefficient Curve (α)</h3>
-    <canvas id="absorptionChart"></canvas>
-  </div>
-</div>
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Initialize Icons
+        lucide.createIcons();
 
-<script src="app.js"></script>
+        // State Management
+        let specimenHistory = [];
+        let currentTestData = {
+            name: "Coconut Coir - 20mm",
+            frequencies: [250, 500, 1000, 2000, 3150, 4000, 5000],
+            absorption: [0.15, 0.42, 0.78, 0.95, 0.88, 0.81, 0.75]
+        };
+
+        // Chart Initialization
+        const ctx = document.getElementById('absorptionChart').getContext('2d');
+        const absorptionChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: currentTestData.frequencies,
+                datasets: [{
+                    label: currentTestData.name,
+                    data: currentTestData.absorption,
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#6366f1'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Frequency (Hz)', color: '#94a3b8' },
+                        grid: { color: '#1e293b' },
+                        ticks: { color: '#94a3b8' }
+                    },
+                    y: {
+                        title: { display: true, text: 'Absorption Coefficient (α)', color: '#94a3b8' },
+                        min: 0,
+                        max: 1,
+                        grid: { color: '#1e293b' },
+                        ticks: { color: '#94a3b8' }
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: '#f8fafc' } }
+                }
+            }
+        });
+
+        // Update Raw Data Table UI
+        function updateRawDataTable() {
+            const tbody = document.getElementById('rawDataTable');
+            tbody.innerHTML = '';
+            for (let i = 0; i < currentTestData.frequencies.length; i++) {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-slate-900 hover:bg-slate-900/50';
+                row.innerHTML = `
+                    <td class="p-1">${currentTestData.frequencies[i]} Hz</td>
+                    <td class="p-1 font-semibold text-indigo-400">${currentTestData.absorption[i].toFixed(2)}</td>
+                `;
+                tbody.appendChild(row);
+            }
+        }
+
+        // Simulate new measurement test run
+        function runTestSimulation() {
+            const name = document.getElementById('specimenInput').value;
+            const density = parseFloat(document.getElementById('materialDensity').value) || 100;
+            
+            // Generate pseudo-random realistic absorption curve based on density
+            currentTestData.name = name;
+            currentTestData.absorption = currentTestData.frequencies.map(f => {
+                let base = Math.min(0.95, (density / 150) * (1 - Math.abs(f - 2500) / 3000));
+                return Math.max(0.1, parseFloat((base + (Math.random() * 0.1 - 0.05)).toFixed(2)));
+            });
+
+            // Update Chart & UI
+            absorptionChart.data.datasets[0].label = currentTestData.name;
+            absorptionChart.data.datasets[0].data = currentTestData.absorption;
+            absorptionChart.update();
+            
+            document.getElementById('currentActiveLabel').innerText = `Viewing: ${currentTestData.name}`;
+            updateRawDataTable();
+        }
+
+        // Save current test to sidebar history
+        function saveCurrentTest() {
+            const newRecord = {
+                id: Date.now(),
+                name: document.getElementById('specimenInput').value,
+                date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                frequencies: [...currentTestData.frequencies],
+                absorption: [...currentTestData.absorption]
+            };
+            specimenHistory.unshift(newRecord);
+            renderHistorySidebar();
+        }
+
+        // Render Sidebar History List
+        function renderHistorySidebar() {
+            const listEl = document.getElementById('historyList');
+            document.getElementById('historyCount').innerText = `${specimenHistory.length} saved`;
+
+            if (specimenHistory.length === 0) {
+                listEl.innerHTML = `<p class="text-xs text-slate-500 text-center py-8">No saved specimens yet. Run a test and click "Save to History".</p>`;
+                return;
+            }
+
+            listEl.innerHTML = '';
+            specimenHistory.forEach(record => {
+                const item = document.createElement('div');
+                item.className = 'bg-slate-950 border border-slate-800 rounded-lg p-3 hover:border-indigo-500/50 transition flex flex-col gap-2';
+                item.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-white truncate max-w-[150px]" id="title-${record.id}">${record.name}</span>
+                        <span class="text-[10px] text-slate-500">${record.date}</span>
+                    </div>
+                    <div class="flex items-center justify-between pt-1 border-t border-slate-900">
+                        <button onclick="loadRecord(${record.id})" class="text-xs text-indigo-400 hover:underline flex items-center gap-1">
+                            <i data-lucide="eye" class="w-3 h-3"></i> Load
+                        </button>
+                        <button onclick="renameRecord(${record.id})" class="text-xs text-slate-400 hover:text-white flex items-center gap-1">
+                            <i data-lucide="edit-2" class="w-3 h-3"></i> Rename
+                        </button>
+                        <button onclick="deleteRecord(${record.id})" class="text-xs text-rose-400 hover:underline flex items-center gap-1">
+                            <i data-lucide="trash-2" class="w-3 h-3"></i>
+                        </button>
+                    </div>
+                `;
+                listEl.appendChild(item);
+            });
+            lucide.createIcons();
+        }
+
+        // Load specific specimen from history into active view
+        function loadRecord(id) {
+            const record = specimenHistory.find(r => r.id === id);
+            if (!record) return;
+
+            currentTestData = {
+                name: record.name,
+                frequencies: [...record.frequencies],
+                absorption: [...record.absorption]
+            };
+
+            document.getElementById('specimenInput').value = record.name;
+            document.getElementById('currentActiveLabel').innerText = `Viewing: ${record.name}`;
+            
+            absorptionChart.data.datasets[0].label = record.name;
+            absorptionChart.data.datasets[0].data = record.absorption;
+            absorptionChart.update();
+            updateRawDataTable();
+        }
+
+        // Rename specimen in history
+        function renameRecord(id) {
+            const record = specimenHistory.find(r => r.id === id);
+            if (!record) return;
+
+            const newName = prompt("Enter new name for this specimen:", record.name);
+            if (newName && newName.trim() !== "") {
+                record.name = newName.trim();
+                if (currentTestData.name === record.name) {
+                    document.getElementById('specimenInput').value = record.name;
+                }
+                renderHistorySidebar();
+            }
+        }
+
+        // Delete record from history
+        function deleteRecord(id) {
+            specimenHistory = specimenHistory.filter(r => r.id !== id);
+            renderHistorySidebar();
+        }
+
+        // Export Raw Data as CSV
+        function exportCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,Frequency (Hz),Absorption Coefficient (Alpha)\n";
+            for (let i = 0; i < currentTestData.frequencies.length; i++) {
+                csvContent += `${currentTestData.frequencies[i]},${currentTestData.absorption[i]}\n`;
+            }
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `${currentTestData.name.replace(/\s+/g, '_')}_raw_data.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Initial setup
+        updateRawDataTable();
+    </script>
 </body>
 </html>
