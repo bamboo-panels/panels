@@ -9,6 +9,11 @@ let currentTestData = {
     absorption: [0.12, 0.38, 0.72, 0.91, 0.85, 0.79, 0.72]
 };
 
+// Web Audio API Variables for Audio Generator / Uploader
+let audioCtx = null;
+let noiseNode = null;
+let isPlayingAudio = false;
+
 // Automatic Density Calculation Function
 function calculateDensity() {
     const diameterMm = parseFloat(document.getElementById('tubeDiameter').value);
@@ -126,10 +131,7 @@ function saveCurrentTest() {
         absorption: [...currentTestData.absorption]
     };
     specimenHistory.unshift(newRecord);
-    
-    // Save to browser Local Storage
     localStorage.setItem('acoustic_specimen_history', JSON.stringify(specimenHistory));
-    
     renderHistorySidebar();
 }
 
@@ -226,6 +228,83 @@ function exportCSV() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+// Audio Player & Signal Generator Functions
+function loadCustomAudio(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const audioEl = document.getElementById('audioElement');
+        audioEl.src = URL.createObjectURL(file);
+        stopAudioPlayback();
+    }
+}
+
+function toggleAudioPlayback() {
+    const audioEl = document.getElementById('audioElement');
+    const playBtn = document.getElementById('audioPlayBtn');
+    const signalType = document.getElementById('audioSignalType').value;
+
+    if (isPlayingAudio) {
+        stopAudioPlayback();
+        return;
+    }
+
+    if (audioEl.src && audioEl.src !== window.location.href) {
+        audioEl.play();
+        isPlayingAudio = true;
+        playBtn.innerHTML = `<i data-lucide="square" class="w-3 h-3"></i> Pause Signal`;
+        playBtn.className = "flex-1 bg-rose-600 hover:bg-rose-500 text-white py-1.5 rounded text-xs font-medium transition flex items-center justify-center gap-1";
+    } else {
+        // Generate Web Audio API Noise/Sweep
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        const bufferSize = 2 * audioCtx.sampleRate;
+        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+
+        for (let i = 0; i < bufferSize; i++) {
+            if (signalType === 'whitenoise') {
+                output[i] = Math.random() * 2 - 1;
+            } else if (signalType === 'pinknoise') {
+                let b0 = 0, b1 = 0, b2 = 0;
+                let white = Math.random() * 2 - 1;
+                b0 = 0.99886 * b0 + white * 0.0555179;
+                b1 = 0.99332 * b1 + white * 0.0750759;
+                output[i] = b0 + b1 + white * 0.5362;
+            } else {
+                output[i] = Math.sin((i / audioCtx.sampleRate) * 440 * Math.PI * 2);
+            }
+        }
+
+        noiseNode = audioCtx.createBufferSource();
+        noiseNode.buffer = noiseBuffer;
+        noiseNode.loop = true;
+        noiseNode.connect(audioCtx.destination);
+        noiseNode.start();
+        isPlayingAudio = true;
+
+        playBtn.innerHTML = `<i data-lucide="square" class="w-3 h-3"></i> Stop Signal`;
+        playBtn.className = "flex-1 bg-rose-600 hover:bg-rose-500 text-white py-1.5 rounded text-xs font-medium transition flex items-center justify-center gap-1";
+    }
+    lucide.createIcons();
+}
+
+function stopAudioPlayback() {
+    const audioEl = document.getElementById('audioElement');
+    audioEl.pause();
+    audioEl.currentTime = 0;
+
+    if (noiseNode) {
+        try { noiseNode.stop(); } catch(e) {}
+        noiseNode = null;
+    }
+    isPlayingAudio = false;
+
+    const playBtn = document.getElementById('audioPlayBtn');
+    playBtn.innerHTML = `<i data-lucide="play" class="w-3 h-3"></i> Play Signal`;
+    playBtn.className = "flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-1.5 rounded text-xs font-medium transition flex items-center justify-center gap-1";
+    lucide.createIcons();
 }
 
 // Initial setup
