@@ -47,7 +47,7 @@ document.getElementById('audioFile').addEventListener('change', async function(e
   const meanAlpha = sumAlpha / targetFreqs.length;
   document.getElementById('meanAlpha').innerText = meanAlpha.toFixed(3);
 
-  // 4. Render Chart with Tooltips Enabled
+  // 4. Render Chart with Persistent Tooltip Options
   renderChart(freqs, alpha);
 });
 
@@ -104,10 +104,10 @@ function renderChart(freqs, alpha) {
         data: alpha,
         borderColor: '#4caf50',
         backgroundColor: 'rgba(76, 175, 80, 0.15)',
-        borderWidth: 2,
+        borderWidth: 2.5,
         fill: true,
-        pointRadius: 0,             // Hides dots by default...
-        pointHoverRadius: 6,        // ...and reveals a nice point when hovered!
+        pointRadius: 0,
+        pointHoverRadius: 8,         // Larger point when hovered
         pointHoverBackgroundColor: '#81c784',
         pointHoverBorderColor: '#ffffff',
         pointHoverBorderWidth: 2
@@ -116,19 +116,25 @@ function renderChart(freqs, alpha) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      // Keeps the tooltip locked and stable near the cursor
       interaction: {
-        mode: 'index',
+        mode: 'nearest',
         intersect: false,
+      },
+      hover: {
+        mode: 'nearest',
+        intersect: false
       },
       plugins: {
         tooltip: {
           enabled: true,
-          backgroundColor: 'rgba(20, 20, 20, 0.9)',
+          backgroundColor: 'rgba(20, 20, 20, 0.95)',
           titleFont: { size: 14, weight: 'bold' },
           bodyFont: { size: 13 },
           borderColor: '#4caf50',
           borderWidth: 1,
-          padding: 10,
+          padding: 12,
+          caretPadding: 10,
           callbacks: {
             title: function(context) {
               return 'Frequency: ' + context[0].label + ' Hz';
