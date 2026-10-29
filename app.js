@@ -1,13 +1,36 @@
-// Initialize Icons
+// Initialize Lucide Icons
 lucide.createIcons();
 
 // State Management
 let specimenHistory = [];
 let currentTestData = {
-    name: "Coconut Coir - 20mm",
+    name: "Bamboo Panel (1A)",
     frequencies: [250, 500, 1000, 2000, 3150, 4000, 5000],
-    absorption: [0.15, 0.42, 0.78, 0.95, 0.88, 0.81, 0.75]
+    absorption: [0.12, 0.38, 0.72, 0.91, 0.85, 0.79, 0.72]
 };
+
+// Automatic Density Calculation Function
+function calculateDensity() {
+    const diameterMm = parseFloat(document.getElementById('tubeDiameter').value);
+    const massGrams = parseFloat(document.getElementById('sampleMass').value) || 0;
+    const thicknessMm = parseFloat(document.getElementById('sampleThickness').value) || 0;
+
+    if (thicknessMm <= 0 || massGrams <= 0) return;
+
+    // Convert to SI units
+    const radiusM = (diameterMm / 2) / 1000;
+    const thicknessM = thicknessMm / 1000;
+    const massKg = massGrams / 1000;
+
+    // Cylinder volume: V = π * r^2 * h
+    const volumeM3 = Math.PI * Math.pow(radiusM, 2) * thicknessM;
+
+    // Density: ρ = m / V
+    const density = massKg / volumeM3;
+
+    // Update material density field
+    document.getElementById('materialDensity').value = Math.round(density);
+}
 
 // Chart Initialization
 const ctx = document.getElementById('absorptionChart').getContext('2d');
@@ -65,19 +88,17 @@ function updateRawDataTable() {
     }
 }
 
-// Simulate new measurement test run
+// Run measurement simulation
 function runTestSimulation() {
     const name = document.getElementById('specimenInput').value;
     const density = parseFloat(document.getElementById('materialDensity').value) || 100;
     
-    // Generate pseudo-random realistic absorption curve based on density
     currentTestData.name = name;
     currentTestData.absorption = currentTestData.frequencies.map(f => {
         let base = Math.min(0.95, (density / 150) * (1 - Math.abs(f - 2500) / 3000));
         return Math.max(0.1, parseFloat((base + (Math.random() * 0.1 - 0.05)).toFixed(2)));
     });
 
-    // Update Chart & UI
     absorptionChart.data.datasets[0].label = currentTestData.name;
     absorptionChart.data.datasets[0].data = currentTestData.absorption;
     absorptionChart.update();
@@ -115,7 +136,7 @@ function renderHistorySidebar() {
         item.className = 'bg-slate-950 border border-slate-800 rounded-lg p-3 hover:border-indigo-500/50 transition flex flex-col gap-2';
         item.innerHTML = `
             <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-white truncate max-w-[150px]" id="title-${record.id}">${record.name}</span>
+                <span class="text-xs font-semibold text-white truncate max-w-[150px]">${record.name}</span>
                 <span class="text-[10px] text-slate-500">${record.date}</span>
             </div>
             <div class="flex items-center justify-between pt-1 border-t border-slate-900">
@@ -192,4 +213,5 @@ function exportCSV() {
 }
 
 // Initial setup
+calculateDensity();
 updateRawDataTable();
