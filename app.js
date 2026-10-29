@@ -42,12 +42,12 @@ document.getElementById('audioFile').addEventListener('change', async function(e
   let sumAlpha = 0;
   targetFreqs.forEach(tf => {
     let closestIndex = freqs.reduce((best, curr, i) => Math.abs(curr - tf) < Math.abs(freqs[best] - tf) ? i : best, 0);
-    sumAlpha += alpha[closestIndex];
+    sumAlpha += parseFloat(alpha[closestIndex]);
   });
   const meanAlpha = sumAlpha / targetFreqs.length;
   document.getElementById('meanAlpha').innerText = meanAlpha.toFixed(3);
 
-  // 4. Render Chart
+  // 4. Render Chart with Tooltips Enabled
   renderChart(freqs, alpha);
 });
 
@@ -102,24 +102,58 @@ function renderChart(freqs, alpha) {
       datasets: [{
         label: 'Bamboo Panel Absorption (α)',
         data: alpha,
-        borderColor: '#2e7d32',
-        backgroundColor: 'rgba(46, 125, 50, 0.1)',
+        borderColor: '#4caf50',
+        backgroundColor: 'rgba(76, 175, 80, 0.15)',
         borderWidth: 2,
         fill: true,
-        pointRadius: 0
+        pointRadius: 0,             // Hides dots by default...
+        pointHoverRadius: 6,        // ...and reveals a nice point when hovered!
+        pointHoverBackgroundColor: '#81c784',
+        pointHoverBorderColor: '#ffffff',
+        pointHoverBorderWidth: 2
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false,
+      },
+      plugins: {
+        tooltip: {
+          enabled: true,
+          backgroundColor: 'rgba(20, 20, 20, 0.9)',
+          titleFont: { size: 14, weight: 'bold' },
+          bodyFont: { size: 13 },
+          borderColor: '#4caf50',
+          borderWidth: 1,
+          padding: 10,
+          callbacks: {
+            title: function(context) {
+              return 'Frequency: ' + context[0].label + ' Hz';
+            },
+            label: function(context) {
+              return ' Absorption (α): ' + context.parsed.y;
+            }
+          }
+        },
+        legend: {
+          labels: { color: '#e0e0e0' }
+        }
+      },
       scales: {
         x: {
-          title: { display: true, text: 'Frequency (Hz)', font: { weight: 'bold' } }
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: { color: '#a0a0a0', maxTicksLimit: 15 },
+          title: { display: true, text: 'Frequency (Hz)', color: '#e0e0e0', font: { weight: 'bold' } }
         },
         y: {
           min: 0,
           max: 1.05,
-          title: { display: true, text: 'Absorption Coefficient (α)', font: { weight: 'bold' } }
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: { color: '#a0a0a0' },
+          title: { display: true, text: 'Absorption Coefficient (α)', color: '#e0e0e0', font: { weight: 'bold' } }
         }
       }
     }
