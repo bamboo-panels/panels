@@ -6,6 +6,46 @@ const x1 = x2 + s;   // Mic 1 to sample distance (15 cm)
 
 let chartInstance = null;
 
+// Custom Plugin to permanently render data labels on key points
+const permanentLabelsPlugin = {
+  id: 'permanentLabelsPlugin',
+  afterDraw(chart) {
+    const ctx = chart.ctx;
+    const meta = chart.getDatasetMeta(0);
+    
+    // Pick specific points to highlight permanently (e.g., around 445.3 Hz or select indices)
+    meta.data.forEach((element, index) => {
+      const dataValue = chart.data.datasets[0].data[index];
+      const freqLabel = chart.data.labels[index];
+
+      // Example condition: permanently label specific frequency regions or every Nth point to avoid clutter
+      // Here we highlight points near 445.3 Hz or significant intervals
+      if (freqLabel === '445.3' || (index > 0 && index % 15 === 0)) {
+        const { x, y } = element.getCenterPoint();
+
+        ctx.save();
+        ctx.fillStyle = '#81c784';
+        ctx.font = 'bold 11px Segoe UI, sans-serif';
+        ctx.textAlign = 'center';
+        
+        // Draw small indicator dot
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        ctx.fillStyle = '#4caf50';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+
+        // Draw text above the point
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(`α: ${dataValue} (${freqLabel}Hz)`, x, y - 10);
+        ctx.restore();
+      }
+    });
+  }
+};
+
 document.getElementById('audioFile').addEventListener('change', async function(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -47,7 +87,7 @@ document.getElementById('audioFile').addEventListener('change', async function(e
   const meanAlpha = sumAlpha / targetFreqs.length;
   document.getElementById('meanAlpha').innerText = meanAlpha.toFixed(3);
 
-  // 4. Render Chart with Persistent Tooltip Options
+  // 4. Render Chart with Permanent Plugin
   renderChart(freqs, alpha);
 });
 
@@ -106,47 +146,18 @@ function renderChart(freqs, alpha) {
         backgroundColor: 'rgba(76, 175, 80, 0.15)',
         borderWidth: 2.5,
         fill: true,
-        pointRadius: 0,
-        pointHoverRadius: 8,         // Larger point when hovered
-        pointHoverBackgroundColor: '#81c784',
-        pointHoverBorderColor: '#ffffff',
-        pointHoverBorderWidth: 2
+        pointRadius: 2,
+        pointBackgroundColor: '#4caf50'
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      // Keeps the tooltip locked and stable near the cursor
-      interaction: {
-        mode: 'nearest',
-        intersect: false,
-      },
-      hover: {
-        mode: 'nearest',
-        intersect: false
-      },
       plugins: {
-        tooltip: {
-          enabled: true,
-          backgroundColor: 'rgba(20, 20, 20, 0.95)',
-          titleFont: { size: 14, weight: 'bold' },
-          bodyFont: { size: 13 },
-          borderColor: '#4caf50',
-          borderWidth: 1,
-          padding: 12,
-          caretPadding: 10,
-          callbacks: {
-            title: function(context) {
-              return 'Frequency: ' + context[0].label + ' Hz';
-            },
-            label: function(context) {
-              return ' Absorption (α): ' + context.parsed.y;
-            }
-          }
-        },
         legend: {
           labels: { color: '#e0e0e0' }
-        }
+        },
+        tooltip: { enabled: false } // Disabled standard tooltip since labels are now permanent
       },
       scales: {
         x: {
@@ -162,6 +173,7 @@ function renderChart(freqs, alpha) {
           title: { display: true, text: 'Absorption Coefficient (α)', color: '#e0e0e0', font: { weight: 'bold' } }
         }
       }
-    }
+    },
+    plugins: [permanentLabelsPlugin]
   });
 }
