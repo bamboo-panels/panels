@@ -51,14 +51,35 @@
                     </div>
                     <div>
                         <label class="text-xs text-slate-400 block mb-1">Tube Diameter (d)</label>
-                        <select id="tubeDiameter" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+                        <select id="tubeDiameter" onchange="calculateDensity()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
                             <option value="100">100 mm (Low Frequency)</option>
                             <option value="30" selected>30 mm (High Frequency)</option>
                         </select>
                     </div>
+
+                    <!-- Density Converter Tool -->
+                    <div class="bg-slate-950 border border-slate-800/80 rounded-lg p-3 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-indigo-300 flex items-center gap-1">
+                                <i data-lucide="calculator" class="w-3.5 h-3.5"></i> Density Converter
+                            </span>
+                            <span class="text-[10px] text-slate-500">Auto-calculated</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] text-slate-400 block mb-1">Mass (g)</label>
+                                <input type="number" id="sampleMass" value="1.7" step="0.1" oninput="calculateDensity()" class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400 block mb-1">Thickness (mm)</label>
+                                <input type="number" id="sampleThickness" value="20" oninput="calculateDensity()" class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                            </div>
+                        </div>
+                    </div>
+
                     <div>
                         <label class="text-xs text-slate-400 block mb-1">Material Density (kg/m³)</label>
-                        <input type="number" id="materialDensity" value="120" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+                        <input type="number" id="materialDensity" value="120" readonly class="w-full bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-2 text-sm text-indigo-400 font-bold focus:outline-none cursor-not-allowed">
                     </div>
                     <button onclick="runTestSimulation()" class="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-slate-200 py-2.5 rounded-lg text-sm font-medium transition border border-slate-700 flex items-center justify-center gap-2">
                         <i data-lucide="play" class="w-4 h-4 text-emerald-400"></i> Run Measurement
@@ -100,7 +121,7 @@
                 <div class="flex items-center justify-between mb-4">
                     <div>
                         <h2 class="text-base font-bold text-white">Sound Absorption Spectrum</h2>
-                        <p class="text-xs text-slate-400" id="currentActiveLabel">Viewing: Coconut Coir - 20mm</p>
+                        <p class="text-xs text-slate-400" id="currentActiveLabel">Viewing: Bamboo Panel (1A)</p>
                     </div>
                     <div class="flex items-center gap-2 text-xs text-slate-400 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
                         <span class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
