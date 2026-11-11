@@ -1,208 +1,224 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DIY Impedance Tube - Acoustic Panel Testing Dashboard</title>
+    <title>BioHUSH | DIY Impedance Tube</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            900: '#0b0f19',
+                            950: '#030712'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen flex flex-col">
+<body class="bg-dark-950 text-slate-100 min-h-screen font-sans antialiased flex flex-col">
 
-    <!-- Top Navigation -->
-    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="p-2 bg-indigo-600 rounded-lg text-white">
-                    <i data-lucide="waves" class="w-6 h-6"></i>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold text-white tracking-wide">BioHUSH <span class="text-indigo-400 font-normal text-sm">| DIY Impedance Tube</span></h1>
-                    <p class="text-xs text-slate-400">Normal-Incidence Sound Absorption Coefficient (&alpha;) Testing</p>
-                </div>
+    <!-- Top Navigation Header -->
+    <header class="border-b border-slate-800 bg-dark-900/80 backdrop-blur sticky top-0 z-50 px-6 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></div>
+            <div>
+                <h1 class="text-sm font-bold tracking-wide text-slate-100">BioHUSH <span class="text-slate-500 font-normal">| DIY Impedance Tube</span></h1>
+                <p class="text-[11px] text-slate-400">Normal-Incidence Sound Absorption Coefficient ($\alpha$) Testing (ISO 10534-2)</p>
             </div>
-            <div class="flex items-center space-x-3">
-                <button onclick="saveCurrentTest()" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-lg shadow-indigo-600/20">
-                    <i data-lucide="save" class="w-4 h-4"></i>
-                    <span>Save to History</span>
-                </button>
-            </div>
+        </div>
+        <div>
+            <button onclick="saveCurrentTest()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="bookmark" class="w-3.5 h-3.5"></i> Save to History
+            </button>
         </div>
     </header>
 
-    <!-- Main Layout Grid -->
-    <div class="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto p-4 gap-6">
+    <!-- Main Dashboard Layout -->
+    <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-[1600px] w-full mx-auto">
 
-        <!-- Left Column: Controls, Audio Player & Raw Data Panel -->
-        <div class="w-full md:w-80 flex flex-col gap-6">
-            <!-- Parameter Controls -->
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
-                <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <i data-lucide="sliders" class="w-4 h-4 text-indigo-400"></i> Tube Parameters
+        <!-- Left Column: Controls & Parameters (4 Cols) -->
+        <section class="lg:col-span-4 space-y-4">
+            
+            <!-- Tube Parameters Card -->
+            <div class="bg-dark-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-3">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <i data-lucide="sliders" class="w-3.5 h-3.5 text-indigo-400"></i> Tube Parameters
                 </h2>
-                <div class="space-y-4">
-                    <div>
-                        <label class="text-xs text-slate-400 block mb-1">Specimen Name</label>
-                        <input type="text" id="specimenInput" value="Bamboo Panel" oninput="updateSpecimenNameLabel()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
-                    </div>
-                    <div>
-                        <label class="text-xs text-slate-400 block mb-1">Tube Diameter (d)</label>
-                        <select id="tubeDiameter" onchange="calculateDensity()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
-                            <option value="100" selected>100 mm (Low Frequency - 4 inch)</option>
-                            <option value="30">30 mm (High Frequency)</option>
-                        </select>
-                    </div>
 
-                    <!-- Density Converter Tool -->
-                    <div class="bg-slate-950 border border-slate-800/80 rounded-lg p-3 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold text-indigo-300 flex items-center gap-1">
-                                <i data-lucide="calculator" class="w-3.5 h-3.5"></i> Density Converter
-                            </span>
-                            <span class="text-[10px] text-slate-500">Auto-calculated</span>
-                        </div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="text-[10px] text-slate-400 block mb-1">Mass (g)</label>
-                                <input type="number" id="sampleMass" value="1.7" step="0.1" oninput="calculateDensity()" class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
-                            </div>
-                            <div>
-                                <label class="text-[10px] text-slate-400 block mb-1">Thickness (mm)</label>
-                                <input type="number" id="sampleThickness" value="20" oninput="calculateDensity()" class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
-                            </div>
-                        </div>
-                    </div>
+                <div>
+                    <label class="block text-[11px] text-slate-400 mb-1">Specimen Name</label>
+                    <input type="text" id="specimenInput" value="Bamboo Panel" oninput="updateSpecimenNameLabel()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                </div>
 
-                    <div>
-                        <label class="text-xs text-slate-400 block mb-1">Material Density (kg/m³)</label>
-                        <input type="number" id="materialDensity" value="120" readonly class="w-full bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-2 text-sm text-indigo-400 font-bold focus:outline-none cursor-not-allowed">
-                    </div>
+                <div>
+                    <label class="block text-[11px] text-slate-400 mb-1">Tube Diameter (d)</label>
+                    <select id="tubeDiameter" onchange="calculateDensity()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                        <option value="100">100 mm (Low Frequency - 4 inch)</option>
+                    </select>
+                </div>
 
-                    <!-- Audio Source / Signal Generator Feature -->
-                    <div class="bg-slate-950 border border-slate-800/80 rounded-lg p-3 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold text-emerald-400 flex items-center gap-1">
-                                <i data-lucide="music" class="w-3.5 h-3.5"></i> Test Audio Generator
-                            </span>
+                <!-- Density Converter -->
+                <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
+                            <i data-lucide="box" class="w-3 h-3 text-indigo-400"></i> Density Converter
+                        </span>
+                        <span class="text-[10px] text-slate-500">Auto-calculated</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-slate-500 mb-0.5">Mass (g)</label>
+                            <input type="number" id="sampleMass" value="1.7" oninput="calculateDensity()" class="w-full bg-dark-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
                         </div>
                         <div>
-                            <label class="text-[10px] text-slate-400 block mb-1">Signal Type / Audio File</label>
-                            <select id="audioSignalType" class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 mb-2">
-                                <option value="whitenoise">White Noise (Standard)</option>
-                                <option value="pinknoise">Pink Noise (Acoustic)</option>
-                                <option value="sweep">Sine Sweep (20Hz - 5kHz)</option>
-                            </select>
-                            <input type="file" id="customAudioFile" accept="audio/*" onchange="loadCustomAudio(event)" class="w-full text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer">
-                        </div>
-                        <div class="flex gap-2 pt-1">
-                            <button onclick="toggleAudioPlayback()" id="audioPlayBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-1.5 rounded text-xs font-medium transition flex items-center justify-center gap-1">
-                                <i data-lucide="play" class="w-3 h-3"></i> Play Signal
-                            </button>
-                            <button onclick="stopAudioPlayback()" class="bg-rose-900/60 hover:bg-rose-900 text-rose-200 px-3 py-1.5 rounded text-xs font-medium transition">
-                                Stop
-                            </button>
-                        </div>
-                        <audio id="audioElement" loop style="display:none;"></audio>
-                    </div>
-
-                    <!-- Acoustic Propagation Time (Time of Flight) Card -->
-                    <div class="bg-slate-950 border border-slate-800/80 rounded-lg p-3 space-y-2">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold text-slate-300 flex items-center gap-1">
-                                <i data-lucide="clock" class="w-3.5 h-3.5 text-emerald-400"></i> Propagation Time
-                            </span>
-                            <span class="text-[10px] text-emerald-400 font-mono" id="tof-status">To Panel</span>
-                        </div>
-                        <div class="grid grid-cols-2 gap-2 text-center">
-                            <div class="bg-slate-900 p-2 rounded border border-slate-800">
-                                <div class="text-[9px] text-slate-400 uppercase font-medium">Time to Specimen</div>
-                                <div class="text-sm font-bold text-emerald-400 font-mono" id="tof-ms">1.78 ms</div>
-                            </div>
-                            <div class="bg-slate-900 p-2 rounded border border-slate-800">
-                                <div class="text-[9px] text-slate-400 uppercase font-medium">Speed of Sound</div>
-                                <div class="text-sm font-bold text-cyan-400 font-mono" id="speed-sound">343 m/s</div>
-                            </div>
-                        </div>
-                        <div class="text-[10px] text-slate-400 flex justify-between pt-1">
-                            <span>Tube Length:</span>
-                            <span id="tube-length-display" class="font-mono text-slate-200">0.61 m (2 ft)</span>
+                            <label class="block text-[10px] text-slate-500 mb-0.5">Thickness (mm)</label>
+                            <input type="number" id="sampleThickness" value="20" oninput="calculateDensity()" class="w-full bg-dark-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
                         </div>
                     </div>
-
-                    <button onclick="runTestSimulation()" class="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-slate-200 py-2.5 rounded-lg text-sm font-medium transition border border-slate-700 flex items-center justify-center gap-2">
-                        <i data-lucide="play" class="w-4 h-4 text-emerald-400"></i> Run Measurement
-                    </button>
-                </div>
-            </div>
-
-            <!-- Raw Data Previewer -->
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex-1 flex flex-col">
-                <div class="flex items-center justify-between mb-3">
-                    <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-indigo-400"></i> Raw Data
-                    </h2>
-                    <button onclick="exportCSV()" class="text-xs text-indigo-400 hover:underline flex items-center gap-1">
-                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
-                    </button>
-                </div>
-                <div class="bg-slate-950 border border-slate-800 rounded-lg p-2 h-48 overflow-y-auto font-mono text-xs text-slate-400">
-                    <table class="w-full text-left">
-                        <thead>
-                            <tr class="border-b border-slate-800 text-slate-500">
-                                <th class="p-1">Freq (Hz)</th>
-                                <th class="p-1">Alpha (&alpha;)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="rawDataTable">
-                            <!-- Populated dynamically -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Center/Right Area: Chart & Specimen History Sidebar -->
-        <div class="flex-1 flex flex-col lg:flex-row gap-6">
-            
-            <!-- Graph Section -->
-            <div class="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col">
-                <div class="flex items-center justify-between mb-4">
                     <div>
-                        <h2 class="text-base font-bold text-white">Sound Absorption Spectrum</h2>
-                        <p class="text-xs text-slate-400" id="currentActiveLabel">Viewing: Bamboo Panel</p>
-                    </div>
-                    <div class="flex items-center gap-2 text-xs text-slate-400 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-                        <span class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
-                        <span>ISO 10534-2 Method</span>
+                        <label class="block text-[10px] text-slate-500 mb-0.5">Material Density (kg/m³)</label>
+                        <input type="text" id="materialDensity" readonly class="w-full bg-dark-950/40 border border-slate-800/50 rounded px-2 py-1 text-xs text-indigo-400 font-bold focus:outline-none cursor-default">
                     </div>
                 </div>
-                <div class="flex-1 relative min-h-[350px]">
-                    <canvas id="absorptionChart"></canvas>
+
+                <!-- Test Audio Generator -->
+                <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 space-y-2">
+                    <span class="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
+                        <i data-lucide="volume-2" class="w-3 h-3 text-indigo-400"></i> Test Audio Generator
+                    </span>
+                    <div>
+                        <label class="block text-[10px] text-slate-500 mb-0.5">Signal Type / Audio File</label>
+                        <select id="audioSignalType" class="w-full bg-dark-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <option value="whitenoise">White Noise (Standard)</option>
+                            <option value="pinknoise">Pink Noise</option>
+                            <option value="sweep">Sine Sweep (20Hz - 2000Hz)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <input type="file" id="audioFile" accept="audio/*" onchange="loadCustomAudio(event)" class="hidden">
+                        <button onclick="document.getElementById('audioFile').click()" class="w-full border border-dashed border-slate-700 hover:border-indigo-500 text-slate-400 hover:text-slate-200 text-[11px] py-1 px-2 rounded transition flex items-center justify-center gap-1">
+                            <i data-lucide="upload" class="w-3 h-3"></i> Choose Audio File
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2 pt-1">
+                        <button id="audioPlayBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold py-1.5 px-3 rounded transition flex items-center justify-center gap-1 shadow-sm">
+                            <i data-lucide="play" class="w-3 h-3"></i> Play Signal
+                        </button>
+                        <button onclick="stopAudioPlayback()" class="bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-semibold py-1.5 px-3 rounded transition">
+                            Stop
+                        </button>
+                    </div>
+                    <audio id="audioElement" preload="auto" loop></audio>
                 </div>
+
+                <!-- Propagation Time Info -->
+                <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] text-slate-500 uppercase font-mono block">Propagation Time</span>
+                        <span id="tof-ms" class="text-sm font-bold text-indigo-400 font-mono">1.78 ms</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] text-slate-500 uppercase font-mono block">Speed of Sound</span>
+                        <span id="speed-sound" class="text-sm font-bold text-slate-200 font-mono">343 m/s</span>
+                    </div>
+                </div>
+
+                <!-- Seal Integrity & Air-Leak Indicator Card -->
+                <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] text-slate-400 uppercase font-mono block">Sample Seal Integrity</span>
+                        <span id="sealScoreDisplay" class="text-base font-bold text-slate-100 font-mono">--%</span>
+                    </div>
+                    <span id="sealStatusBadge" class="text-[10px] font-bold px-2.5 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                        UNCHECKED
+                    </span>
+                </div>
+
+                <!-- Run Measurement Trigger -->
+                <button onclick="runTestSimulation()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs py-2.5 rounded-lg transition shadow-md flex items-center justify-center gap-2">
+                    <i data-lucide="activity" class="w-4 h-4"></i> Run Measurement
+                </button>
             </div>
 
-            <!-- Specimen History Sidebar -->
-            <div class="w-full lg:w-80 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                        <i data-lucide="history" class="w-4 h-4 text-indigo-400"></i> Specimen History
-                    </h2>
-                    <span id="historyCount" class="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">0 saved</span>
+        </section>
+
+        <!-- Center Column: Sound Absorption Spectrum Chart (5 Cols) -->
+        <section class="lg:col-span-5 bg-dark-900 border border-slate-800 rounded-xl p-4 shadow-md flex flex-col">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h2 class="text-sm font-bold text-slate-100">Sound Absorption Spectrum</h2>
+                    <p id="currentActiveLabel" class="text-xs text-indigo-400 font-medium">Viewing: Bamboo Panel</p>
                 </div>
-                <div class="flex-1 overflow-y-auto space-y-3 max-h-[450px]" id="historyList">
+                <span class="text-[11px] font-semibold px-2.5 py-1 rounded bg-slate-800/80 text-slate-300 border border-slate-700">ISO 10534-2 Method</span>
+            </div>
+            <div class="flex-1 relative min-h-[350px]">
+                <canvas id="absorptionChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Right Column: Specimen History & Raw Data Table (3 Cols) -->
+        <section class="lg:col-span-3 space-y-4">
+            
+            <!-- Specimen History Card -->
+            <div class="bg-dark-900 border border-slate-800 rounded-xl p-4 shadow-md flex flex-col max-h-[320px]">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <i data-lucide="history" class="w-3.5 h-3.5 text-indigo-400"></i> Specimen History
+                    </h2>
+                    <span id="historyCount" class="text-[10px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded">0 saved</span>
+                </div>
+                <div id="historyList" class="flex-1 overflow-y-auto space-y-2 pr-1">
                     <p class="text-xs text-slate-500 text-center py-8">No saved specimens yet. Run a test and click "Save to History".</p>
                 </div>
             </div>
 
-        </div>
+            <!-- Raw Data Table Card -->
+            <div class="bg-dark-900 border border-slate-800 rounded-xl p-4 shadow-md flex flex-col max-h-[300px]">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <i data-lucide="table" class="w-3.5 h-3.5 text-indigo-400"></i> Raw Data (Max 2kHz)
+                    </h2>
+                    <button onclick="exportCSV()" class="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto border border-slate-800 rounded-lg">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-950 text-slate-400 sticky top-0 border-b border-slate-800">
+                            <tr>
+                                <th class="p-2">Freq (Hz)</th>
+                                <th class="p-2">Alpha ($\alpha$)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rawDataTable" class="divide-y divide-slate-900 text-slate-300">
+                            <!-- Populated dynamically by app.js -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-    </div>
+        </section>
 
-    <!-- Link to External JavaScript File -->
+    </main>
+
+    <!-- App Logic Script -->
     <script src="app.js"></script>
+    <script>
+        // Initialize Lucide icons on load
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    </script>
 </body>
 </html>
