@@ -60,7 +60,7 @@ function calculateTimeOfFlight(distanceMeters = 0.6096, tempCelsius = 20) {
     if (distElement) distElement.textContent = `${distanceMeters.toFixed(2)} m (2 ft)`;
 }
 
-// Initialize Chart.js graph
+// Initialize Chart.js graph (Capped strictly at 2,000 Hz for 4-inch tube limits)
 function initChart() {
     const canvasEl = document.getElementById('absorptionChart');
     if (!canvasEl) return;
@@ -69,10 +69,10 @@ function initChart() {
     absorptionChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '2000 Hz', '2500 Hz', '3000 Hz', '4000 Hz', '5000 Hz'],
+            labels: ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '1750 Hz', '2000 Hz'],
             datasets: [{
                 label: 'Bamboo Panel (\u03b1)',
-                data: [0.12, 0.28, 0.45, 0.68, 0.82, 0.75, 0.58, 0.42, 0.35, 0.25, 0.18],
+                data: [0.15, 0.32, 0.50, 0.72, 0.85, 0.78, 0.62, 0.45],
                 borderColor: '#6366f1',
                 backgroundColor: 'rgba(99, 102, 241, 0.1)',
                 borderWidth: 2,
@@ -121,7 +121,7 @@ function updateSpecimenNameLabel() {
     }
 }
 
-// Robust Measurement Function with Live Mic or Safe Fallback
+// Robust Measurement Function with Live Mic or Safe Fallback (Max 2,000 Hz)
 async function runTestSimulation() {
     const specimenName = document.getElementById('specimenInput').value || 'Bamboo Panel';
     let liveEnergyFactor = 0.5; // Default energy balance
@@ -156,7 +156,7 @@ async function runTestSimulation() {
         console.warn("Live mic stream unavailable or restricted (using simulation fallback):", error);
     }
 
-    // Generate Absorption Spectrum Data influenced by live mic energy or simulation
+    // Generate Absorption Spectrum Data up to 2,000 Hz
     const newData = absorptionChart.data.labels.map(() => {
         let baseVal = 0.3 + (liveEnergyFactor * 0.4);
         const randomVariation = (Math.random() * 0.12) - 0.06;
@@ -196,7 +196,7 @@ function exportCSV() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "impedance_tube_absorption_data.csv");
+    link.setAttribute("download", "impedance_tube_absorption_data_2khz.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -260,7 +260,7 @@ function loadHistoryItem(index) {
     updateRawDataTable();
 }
 
-// Toggle Play / Pause for the Test Audio Generator
+// Toggle Play / Pause for the Test Audio Generator (Sweeping up to 2,000 Hz)
 function toggleAudioPlayback() {
     const btn = document.getElementById('audioPlayBtn');
     const signalType = document.getElementById('audioSignalType').value;
@@ -298,10 +298,11 @@ function toggleAudioPlayback() {
         activeNoiseNode.start();
 
     } else if (signalType === 'sweep') {
+        // Frequency sweep capped cleanly from 20 Hz up to 2000 Hz
         activeNoiseNode = signalAudioCtx.createOscillator();
         activeNoiseNode.type = 'sine';
         activeNoiseNode.frequency.setValueAtTime(20, signalAudioCtx.currentTime);
-        activeNoiseNode.frequency.exponentialRampToValueAtTime(5000, signalAudioCtx.currentTime + 5);
+        activeNoiseNode.frequency.exponentialRampToValueAtTime(2000, signalAudioCtx.currentTime + 5);
         activeNoiseNode.connect(activeGainNode);
         activeNoiseNode.start();
     }
