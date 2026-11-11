@@ -11,6 +11,10 @@ let micStream = null;
 let analyserNode = null;
 let dataArray = null;
 
+let signalAudioCtx = null;
+let activeNoiseNode = null;
+let activeGainNode = null;
+
 // Tube Geometry Constants (ISO 10534-2 Setup)
 const TUBE_DIAMETER_M = 0.1016; // 4-inch PVC tube (~101.6 mm)
 const MIC_SPACING_S = 0.05;   // Distance between Microphone 1 and Microphone 2 (50 mm)
@@ -35,6 +39,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     renderHistoryList();
+
+    // Wire up audio buttons dynamically
+    const playBtn = document.getElementById('audioPlayBtn');
+    if (playBtn) {
+        playBtn.addEventListener('click', toggleAudioPlayback);
+    }
 
     // Automatically start continuous ISO transfer-function measurement on load
     startAutoMeasurement();
@@ -360,53 +370,64 @@ function loadHistoryItem(index) {
     updateRawDataTable();
 }
 
-// Direct synchronous audio test function for Microsoft Edge compatibility
-function toggleAudioPlayback() {
-    const btn = document.getElementById('audioPlayBtn');
+// Audio Playback Generator (Original implementation)
+async function toggleAudioPlayback() {
+    const signalType = document.getElementById('audioSignalType').value;
+    const playBtn = document.getElementById('audioPlayBtn');
     
-    const testCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (testCtx.state === 'suspended') {
-        testCtx.resume();
+    if (!signalAudioCtx) {
+        signalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (signalAudioCtx.state === 'suspended') {
+        await signalAudioCtx.resume();
     }
 
-    const osc = testCtx.createOscillator();
-    const gain = testCtx.createGain();
-    
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(440, testCtx.currentTime);
-    gain.gain.setValueAtTime(0.5, testCtx.currentTime);
-    
-    osc.connect(gain);
-    gain.connect(testCtx.destination);
-    
-    osc.start();
-    
-    setTimeout(() => {
-        osc.stop();
-        testCtx.close();
-        if (btn) {
-            btn.classList.remove('bg-amber-600', 'hover:bg-amber-500');
-            btn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
-            btn.innerHTML = `<i data-lucide="play" class="w-3 h-3"></i> Play Signal`;
-            if (typeof lucide !== 'undefined') lucide.createIcons();
-        }
-    }, 2000);
+    if (activeNoiseNode) {
+        stopAudioPlayback();
+        return;
+    }
 
-    if (btn) {
-        btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
-        btn.classList.add('bg-amber-600', 'hover:bg-amber-500');
-        btn.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i> Playing Beep...`;
+    const bufferSize = signalAudioCtx.sampleRate * 2;
+    const noiseBuffer = signalAudioCtx.createBuffer(1, bufferSize, signalAudioCtx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    
+    for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+    }
+
+    activeNoiseNode = signalAudioCtx.createBufferSource();
+    activeNoiseNode.buffer = noiseBuffer;
+    activeNoiseNode.loop = true;
+
+    activeGainNode = signalAudioCtx.createGain();
+    activeGainNode.gain.setValueAtTime(0.3, signalAudioCtx.currentTime);
+
+    activeNoiseNode.connect(activeGainNode);
+    activeGainNode.connect(signalAudioCtx.destination);
+    activeNoiseNode.start();
+
+    if (playBtn) {
+        playBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
+        playBtn.classList.add('bg-amber-600', 'hover:bg-amber-500');
+        playBtn.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i> Playing...`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 }
 
-// Stop Audio Playback safety stub
+// Stop Audio Playback
 function stopAudioPlayback() {
-    const btn = document.getElementById('audioPlayBtn');
-    if (btn) {
-        btn.classList.remove('bg-amber-600', 'hover:bg-amber-500');
-        btn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
-        btn.innerHTML = `<i data-lucide="play" class="w-3 h-3"></i> Play Signal`;
+    if (activeNoiseNode) {
+        try {
+            activeNoiseNode.stop();
+            activeNoiseNode.disconnect();
+        } catch (e) {}
+        activeNoiseNode = null;
+    }
+    const playBtn = document.getElementById('audioPlayBtn');
+    if (playBtn) {
+        playBtn.classList.remove('bg-amber-600', 'hover:bg-amber-500');
+        playBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
+        playBtn.innerHTML = `<i data-lucide="play" class="w-3 h-3"></i> Play Signal`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 }
