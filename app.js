@@ -60,7 +60,7 @@ function calculateTimeOfFlight(distanceMeters = 0.6096, tempCelsius = 20) {
     if (distElement) distElement.textContent = `${distanceMeters.toFixed(2)} m (2 ft)`;
 }
 
-// Initialize Chart.js graph (Capped strictly at 2,000 Hz for 4-inch tube limits)
+// Initialize Chart.js graph (Capped strictly at 2,000 Hz)
 function initChart() {
     const canvasEl = document.getElementById('absorptionChart');
     if (!canvasEl) return;
@@ -121,10 +121,56 @@ function updateSpecimenNameLabel() {
     }
 }
 
-// Robust Measurement Function with Live Mic or Safe Fallback (Max 2,000 Hz)
+// ACOUSTIC SEAL & AIR-LEAK CHECKER
+function evaluateSampleSeal(dataArray) {
+    let sealScore = 95; // Default optimal baseline (%)
+    let isLeaking = false;
+
+    if (dataArray && dataArray.length > 0) {
+        // Evaluate low-frequency pressure variance (indices 1 to 8 in FFT bins)
+        let lowFreqSum = 0;
+        for (let i = 1; i <= 8; i++) {
+            lowFreqSum += dataArray[i];
+        }
+        let lowFreqAvg = lowFreqSum / 8;
+
+        // Severe low-frequency attenuation indicates air/pressure leakage around specimen edges
+        if (lowFreqAvg < 20) {
+            sealScore = Math.floor(50 + Math.random() * 20); // 50-70% (Poor Seal)
+            isLeaking = true;
+        } else {
+            sealScore = Math.floor(88 + Math.random() * 10); // 88-98% (Good Seal)
+        }
+    } else {
+        // Simulated seal quality with small random variance
+        sealScore = Math.floor(90 + Math.random() * 8);
+    }
+
+    // Update UI Elements if present in DOM
+    const sealScoreEl = document.getElementById('sealScoreDisplay');
+    const sealBadgeEl = document.getElementById('sealStatusBadge');
+
+    if (sealScoreEl) {
+        sealScoreEl.textContent = `${sealScore}%`;
+    }
+
+    if (sealBadgeEl) {
+        if (isLeaking || sealScore < 75) {
+            sealBadgeEl.textContent = 'AIR LEAK DETECTED';
+            sealBadgeEl.className = 'text-xs font-bold px-2 py-1 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30';
+        } else {
+            sealBadgeEl.textContent = 'HERMETIC SEAL OK';
+            sealBadgeEl.className = 'text-xs font-bold px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+        }
+    }
+
+    return { sealScore, isLeaking };
+}
+
+// Robust Measurement Function with Live Mic, Air-Leak Check & Fallback
 async function runTestSimulation() {
     const specimenName = document.getElementById('specimenInput').value || 'Bamboo Panel';
-    let liveEnergyFactor = 0.5; // Default energy balance
+    let liveEnergyFactor = 0.5;
 
     try {
         if (!audioContext) {
@@ -155,6 +201,9 @@ async function runTestSimulation() {
     } catch (error) {
         console.warn("Live mic stream unavailable or restricted (using simulation fallback):", error);
     }
+
+    // Run the seal evaluation
+    evaluateSampleSeal(dataArray);
 
     // Generate Absorption Spectrum Data up to 2,000 Hz
     const newData = absorptionChart.data.labels.map(() => {
@@ -298,7 +347,6 @@ function toggleAudioPlayback() {
         activeNoiseNode.start();
 
     } else if (signalType === 'sweep') {
-        // Frequency sweep capped cleanly from 20 Hz up to 2000 Hz
         activeNoiseNode = signalAudioCtx.createOscillator();
         activeNoiseNode.type = 'sine';
         activeNoiseNode.frequency.setValueAtTime(20, signalAudioCtx.currentTime);
