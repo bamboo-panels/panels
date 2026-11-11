@@ -112,8 +112,7 @@
                         </button>
                     </div>
                     <div class="flex items-center gap-2 pt-1">
-                        <!-- DIRECT ONCLICK WRAPPER TO FORCE MICROSOFT EDGE AUDIO CONTEXT ACTIVATION -->
-                        <button id="audioPlayBtn" onclick="toggleAudioPlayback()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold py-1.5 px-3 rounded transition flex items-center justify-center gap-1 shadow-sm">
+                        <button id="audioPlayBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold py-1.5 px-3 rounded transition flex items-center justify-center gap-1 shadow-sm">
                             <i data-lucide="play" class="w-3 h-3"></i> Play Signal
                         </button>
                         <button onclick="stopAudioPlayback()" class="bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-semibold py-1.5 px-3 rounded transition">
@@ -212,7 +211,6 @@
     <!-- App Logic Script -->
     <script src="app.js"></script>
     <script>
-        // Initialize Lucide icons on load
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
