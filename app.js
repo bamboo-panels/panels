@@ -375,6 +375,11 @@ async function toggleAudioPlayback() {
     const btn = document.getElementById('audioPlayBtn');
     const signalType = document.getElementById('audioSignalType').value;
 
+    // Reset closed context to force binding to the currently active audio playback output
+    if (signalAudioCtx && signalAudioCtx.state === 'closed') {
+        signalAudioCtx = null;
+    }
+
     if (!signalAudioCtx) {
         signalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
@@ -389,7 +394,7 @@ async function toggleAudioPlayback() {
     }
 
     activeGainNode = signalAudioCtx.createGain();
-    activeGainNode.gain.value = 0.5; // Boosted volume level for clear output
+    activeGainNode.gain.value = 0.5; // 50% volume level for clear output
     activeGainNode.connect(signalAudioCtx.destination);
 
     if (signalType === 'whitenoise' || signalType === 'pinknoise') {
