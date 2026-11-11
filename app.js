@@ -13,7 +13,7 @@ let signalAudioCtx = null;
 let activeNoiseNode = null;
 let activeGainNode = null;
 
-// Initialize Lucide icons, Chart, and calculators on page load
+// Initialize Lucide icons, Chart, calculators, and button listeners on page load
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
@@ -21,6 +21,12 @@ document.addEventListener('DOMContentLoaded', () => {
     initChart();
     calculateDensity();
     calculateTimeOfFlight(0.6096, 20); // Initialize for 2-foot tube at 20°C
+
+    // Wire up audio buttons dynamically
+    const playBtn = document.getElementById('audioPlayBtn');
+    if (playBtn) {
+        playBtn.addEventListener('click', toggleAudioPlayback);
+    }
 });
 
 // Calculate material density from mass and thickness
@@ -60,7 +66,7 @@ function calculateTimeOfFlight(distanceMeters = 0.6096, tempCelsius = 20) {
     if (distElement) distElement.textContent = `${distanceMeters.toFixed(2)} m (2 ft)`;
 }
 
-// Initialize Chart.js graph (Capped strictly at 2,000 Hz)
+// Initialize Chart.js graph (Capped strictly at 2,000 Hz for 4-inch tube limits)
 function initChart() {
     const canvasEl = document.getElementById('absorptionChart');
     if (!canvasEl) return;
@@ -127,26 +133,22 @@ function evaluateSampleSeal(dataArray) {
     let isLeaking = false;
 
     if (dataArray && dataArray.length > 0) {
-        // Evaluate low-frequency pressure variance (indices 1 to 8 in FFT bins)
         let lowFreqSum = 0;
         for (let i = 1; i <= 8; i++) {
             lowFreqSum += dataArray[i];
         }
         let lowFreqAvg = lowFreqSum / 8;
 
-        // Severe low-frequency attenuation indicates air/pressure leakage around specimen edges
         if (lowFreqAvg < 20) {
-            sealScore = Math.floor(50 + Math.random() * 20); // 50-70% (Poor Seal)
+            sealScore = Math.floor(50 + Math.random() * 20);
             isLeaking = true;
         } else {
-            sealScore = Math.floor(88 + Math.random() * 10); // 88-98% (Good Seal)
+            sealScore = Math.floor(88 + Math.random() * 10);
         }
     } else {
-        // Simulated seal quality with small random variance
         sealScore = Math.floor(90 + Math.random() * 8);
     }
 
-    // Update UI Elements if present in DOM
     const sealScoreEl = document.getElementById('sealScoreDisplay');
     const sealBadgeEl = document.getElementById('sealStatusBadge');
 
@@ -167,7 +169,7 @@ function evaluateSampleSeal(dataArray) {
     return { sealScore, isLeaking };
 }
 
-// Robust Measurement Function with Live Mic, Air-Leak Check & Fallback
+// Robust Measurement Function with Live Mic, Air-Leak Check & Fallback (Max 2,000 Hz)
 async function runTestSimulation() {
     const specimenName = document.getElementById('specimenInput').value || 'Bamboo Panel';
     let liveEnergyFactor = 0.5;
@@ -202,10 +204,8 @@ async function runTestSimulation() {
         console.warn("Live mic stream unavailable or restricted (using simulation fallback):", error);
     }
 
-    // Run the seal evaluation
     evaluateSampleSeal(dataArray);
 
-    // Generate Absorption Spectrum Data up to 2,000 Hz
     const newData = absorptionChart.data.labels.map(() => {
         let baseVal = 0.3 + (liveEnergyFactor * 0.4);
         const randomVariation = (Math.random() * 0.12) - 0.06;
