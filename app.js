@@ -11,10 +11,6 @@ let micStream = null;
 let analyserNode = null;
 let dataArray = null;
 
-let signalAudioCtx = null;
-let activeNoiseNode = null;
-let activeGainNode = null;
-
 // Tube Geometry Constants (ISO 10534-2 Setup)
 const TUBE_DIAMETER_M = 0.1016; // 4-inch PVC tube (~101.6 mm)
 const MIC_SPACING_S = 0.05;   // Distance between Microphone 1 and Microphone 2 (50 mm)
@@ -39,12 +35,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     renderHistoryList();
-
-    // Wire up audio buttons dynamically
-    const playBtn = document.getElementById('audioPlayBtn');
-    if (playBtn) {
-        playBtn.addEventListener('click', toggleAudioPlayback);
-    }
 
     // Automatically start continuous ISO transfer-function measurement on load
     startAutoMeasurement();
@@ -370,11 +360,10 @@ function loadHistoryItem(index) {
     updateRawDataTable();
 }
 
-// Synchronous standalone audio test function for Microsoft Edge
+// Direct synchronous audio test function for Microsoft Edge compatibility
 function toggleAudioPlayback() {
     const btn = document.getElementById('audioPlayBtn');
     
-    // Create and resume AudioContext synchronously inside the user click event
     const testCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (testCtx.state === 'suspended') {
         testCtx.resume();
@@ -413,7 +402,13 @@ function toggleAudioPlayback() {
 
 // Stop Audio Playback safety stub
 function stopAudioPlayback() {
-    // Handled by timeout or manual reset
+    const btn = document.getElementById('audioPlayBtn');
+    if (btn) {
+        btn.classList.remove('bg-amber-600', 'hover:bg-amber-500');
+        btn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
+        btn.innerHTML = `<i data-lucide="play" class="w-3 h-3"></i> Play Signal`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
 }
 
 // Load custom audio file if uploaded
