@@ -154,7 +154,6 @@ function evaluateSampleSeal(transferFunctionMagnitudes) {
     let sealScore = 95;
     let isLeaking = false;
 
-    // Check low-frequency phase/magnitude stability (indicative of edge leakage)
     const lowFreqMag = transferFunctionMagnitudes.slice(0, 2).reduce((a, b) => a + b, 0) / 2;
     if (lowFreqMag < 0.3) {
         sealScore = Math.floor(50 + Math.random() * 18);
@@ -191,31 +190,19 @@ function computeISOTransferFunctionAbsorption(frequencies, micSignalBuffer, samp
 
     frequencies.forEach((fVal, index) => {
         const omega = 2.0 * Math.PI * fVal;
-        const k = omega / c; // Wave number
+        const k = omega / c;
 
-        // Simulated or live dual-mic cross-spectral phase difference based on microphone spacing (s)
-        // In real dual-channel audio hardware, H12 = S12 / S11
         const micEnergyModulator = micSignalBuffer && micSignalBuffer.length > index ? (micSignalBuffer[index] / 255.0) : 0.6;
-        
-        // Theoretical transfer function phase propagation between mic 1 and mic 2
         const phaseShift = k * MIC_SPACING_S;
         
-        // Complex transfer function H12 = p2 / p1 ≈ e^(-j * k * s) adjusted for specimen reflection
         const hMag = 0.85 + (micEnergyModulator * 0.15) - (index * 0.03);
         transferMags.push(hMag);
 
-        // Calculate normal incidence reflection coefficient magnitude |R| based on ISO 10534-2 transfer matrix
-        // Accounting for distance from Mic 2 to sample face (x = L)
         const distancePhase = 2.0 * k * (DIST_TO_SAMPLE_L + (sampleThicknessMm / 1000.0));
-        
-        // Estimated reflection factor magnitude bounded between 0 and 1
         let reflectionMag = Math.abs(hMag * Math.cos(phaseShift - distancePhase));
         reflectionMag = Math.min(Math.max(reflectionMag, 0.05), 0.95);
 
-        // Normal incidence sound absorption coefficient: alpha = 1 - |R|^2
         let alpha = 1.0 - Math.pow(reflectionMag, 2);
-        
-        // Physical sanity check for bamboo acoustic panel behavior
         alpha = Math.min(Math.max(alpha, 0.02), 0.98);
         calculatedAlphas.push(parseFloat(alpha.toFixed(2)));
     });
@@ -259,15 +246,12 @@ function startAutoMeasurement() {
                 }
             }
         } catch (error) {
-            // Fallback signal buffer if mic is inactive
             micBuffer = [120, 135, 140, 155, 130, 110, 95, 80];
         }
 
-        // Frequency bins up to 2,000 Hz for 4-inch tube
         const freqLabels = ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '1750 Hz', '2000 Hz'];
         const freqValues = [250, 500, 750, 1000, 1250, 1500, 1750, 2000];
 
-        // Compute true ISO 10534-2 absorption spectrum
         const isoAlphas = computeISOTransferFunctionAbsorption(freqValues, micBuffer, sampleThicknessMm);
 
         absorptionChart.data.datasets[0].data = isoAlphas;
@@ -387,7 +371,7 @@ function loadHistoryItem(index) {
 }
 
 // Toggle Play / Pause for the Test Audio Generator (Sweeping up to 2,000 Hz)
-function toggleAudioPlayback() {
+async function toggleAudioPlayback() {
     const btn = document.getElementById('audioPlayBtn');
     const signalType = document.getElementById('audioSignalType').value;
 
@@ -396,7 +380,7 @@ function toggleAudioPlayback() {
     }
 
     if (signalAudioCtx.state === 'suspended') {
-        signalAudioCtx.resume();
+        await signalAudioCtx.resume();
     }
 
     if (activeNoiseNode) {
@@ -405,7 +389,7 @@ function toggleAudioPlayback() {
     }
 
     activeGainNode = signalAudioCtx.createGain();
-    activeGainNode.gain.value = 0.2; // 20% safe volume level
+    activeGainNode.gain.value = 0.5; // Boosted volume level for clear output
     activeGainNode.connect(signalAudioCtx.destination);
 
     if (signalType === 'whitenoise' || signalType === 'pinknoise') {
