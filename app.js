@@ -370,84 +370,49 @@ function loadHistoryItem(index) {
     updateRawDataTable();
 }
 
-// Toggle Play / Pause for the Test Audio Generator (Sweeping up to 2,000 Hz)
+// Direct standalone audio test function (440 Hz beep tone for troubleshooting)
 async function toggleAudioPlayback() {
     const btn = document.getElementById('audioPlayBtn');
-    const signalType = document.getElementById('audioSignalType').value;
-
-    // Reset closed context to force binding to the currently active audio playback output
-    if (signalAudioCtx && signalAudioCtx.state === 'closed') {
-        signalAudioCtx = null;
+    
+    const testCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (testCtx.state === 'suspended') {
+        await testCtx.resume();
     }
 
-    if (!signalAudioCtx) {
-        signalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-
-    if (signalAudioCtx.state === 'suspended') {
-        await signalAudioCtx.resume();
-    }
-
-    if (activeNoiseNode) {
-        stopAudioPlayback();
-        return;
-    }
-
-    activeGainNode = signalAudioCtx.createGain();
-    activeGainNode.gain.value = 0.5; // 50% volume level for clear output
-    activeGainNode.connect(signalAudioCtx.destination);
-
-    if (signalType === 'whitenoise' || signalType === 'pinknoise') {
-        const bufferSize = 2 * signalAudioCtx.sampleRate;
-        const noiseBuffer = signalAudioCtx.createBuffer(1, bufferSize, signalAudioCtx.sampleRate);
-        const output = noiseBuffer.getChannelData(0);
-        
-        for (let i = 0; i < bufferSize; i++) {
-            output[i] = Math.random() * 2 - 1;
+    const osc = testCtx.createOscillator();
+    const gain = testCtx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(440, testCtx.currentTime);
+    gain.gain.setValueAtTime(0.5, testCtx.currentTime);
+    
+    osc.connect(gain);
+    gain.connect(testCtx.destination);
+    
+    osc.start();
+    
+    setTimeout(() => {
+        osc.stop();
+        testCtx.close();
+        if (btn) {
+            btn.classList.remove('bg-amber-600', 'hover:bg-amber-500');
+            btn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
+            btn.innerHTML = `<i data-lucide="play" class="w-3 h-3"></i> Play Signal`;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
-
-        activeNoiseNode = signalAudioCtx.createBufferSource();
-        activeNoiseNode.buffer = noiseBuffer;
-        activeNoiseNode.loop = true;
-        activeNoiseNode.connect(activeGainNode);
-        activeNoiseNode.start();
-
-    } else if (signalType === 'sweep') {
-        activeNoiseNode = signalAudioCtx.createOscillator();
-        activeNoiseNode.type = 'sine';
-        activeNoiseNode.frequency.setValueAtTime(20, signalAudioCtx.currentTime);
-        activeNoiseNode.frequency.exponentialRampToValueAtTime(2000, signalAudioCtx.currentTime + 5);
-        activeNoiseNode.connect(activeGainNode);
-        activeNoiseNode.start();
-    }
+    }, 2000);
 
     if (btn) {
         btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
         btn.classList.add('bg-amber-600', 'hover:bg-amber-500');
-        btn.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i> Playing...`;
+        btn.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i> Playing Beep...`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 }
 
-// Stop Audio Playback
+// Stop Audio Playback safety stub
 function stopAudioPlayback() {
-    if (activeNoiseNode) {
-        try {
-            activeNoiseNode.stop();
-            activeNoiseNode.disconnect();
-        } catch (e) {
-            // Ignore if already stopped
-        }
-        activeNoiseNode = null;
-    }
-
-    const btn = document.getElementById('audioPlayBtn');
-    if (btn) {
-        btn.classList.remove('bg-amber-600', 'hover:bg-amber-500');
-        btn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
-        btn.innerHTML = `<i data-lucide="play" class="w-3 h-3"></i> Play Signal`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
+    // Handled by timeout or manual reset
 }
 
 // Load custom audio file if uploaded
