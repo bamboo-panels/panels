@@ -370,13 +370,14 @@ function loadHistoryItem(index) {
     updateRawDataTable();
 }
 
-// Direct standalone audio test function (440 Hz beep tone for troubleshooting)
-async function toggleAudioPlayback() {
+// Synchronous standalone audio test function for Microsoft Edge
+function toggleAudioPlayback() {
     const btn = document.getElementById('audioPlayBtn');
     
+    // Create and resume AudioContext synchronously inside the user click event
     const testCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (testCtx.state === 'suspended') {
-        await testCtx.resume();
+        testCtx.resume();
     }
 
     const osc = testCtx.createOscillator();
