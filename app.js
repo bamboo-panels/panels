@@ -18,6 +18,10 @@ const TUBE_DIAMETER_M = 0.1016;
 const MIC_SPACING_S = 0.05;   
 const DIST_TO_SAMPLE_L = 0.40; 
 
+// Observation Sheet Target Frequencies (250 Hz to 2000 Hz in 250 Hz increments)
+const TARGET_FREQUENCIES = [250, 500, 750, 1000, 1250, 1500, 1750, 2000];
+const TARGET_FREQ_LABELS = ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '1750 Hz', '2000 Hz'];
+
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof lucide !== 'undefined') lucide.createIcons();
     initChart();
@@ -57,10 +61,10 @@ function initChart() {
     absorptionChart = new Chart(canvasEl.getContext('2d'), {
         type: 'line',
         data: {
-            labels: ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '2000 Hz', '2500 Hz', '3000 Hz', '4000 Hz', '5000 Hz'],
+            labels: TARGET_FREQ_LABELS,
             datasets: [{
                 label: 'Bamboo Panel (\u03b1)',
-                data: [0.12, 0.28, 0.45, 0.68, 0.82, 0.75, 0.58, 0.42, 0.35, 0.25, 0.18],
+                data: [0.15, 0.32, 0.50, 0.72, 0.85, 0.78, 0.62, 0.45],
                 borderColor: '#6366f1',
                 backgroundColor: 'rgba(99, 102, 241, 0.1)',
                 borderWidth: 2,
@@ -80,7 +84,7 @@ function initChart() {
             }
         }
     });
-    currentTestData = absorptionChart.data.labels.map((label, idx) => ({
+    currentTestData = TARGET_FREQ_LABELS.map((label, idx) => ({
         freq: label,
         alpha: absorptionChart.data.datasets[0].data[idx],
         valid: false
@@ -208,14 +212,13 @@ async function runTestSimulation() {
         }
     } catch (error) {
         console.warn("Live mic stream unavailable or restricted (using simulation fallback):", error);
-        micBuffer = [120, 135, 140, 155, 130, 110, 95, 80, 70, 60, 50];
+        micBuffer = [120, 135, 140, 155, 130, 110, 95, 80];
     }
 
-    const freqLabels = absorptionChart.data.labels;
-    const newData = freqLabels.map((_, idx) => {
+    const newData = TARGET_FREQUENCIES.map((_, idx) => {
         let baseVal = 0.3 + (liveEnergyFactor * 0.4) - (idx * 0.02);
         const randomVariation = (Math.random() * 0.10) - 0.05;
-        return Math.min(Math.max(baseVal + randomVariation, 0.02), 0.98);
+        return parseFloat(Math.min(Math.max(baseVal + randomVariation, 0.02), 0.98).toFixed(2));
     });
 
     const transferMags = newData.map(a => 0.85 + (a * 0.1));
@@ -226,7 +229,7 @@ async function runTestSimulation() {
     absorptionChart.data.datasets[0].label = `${specimenName} (\u03b1)`;
     absorptionChart.update();
 
-    currentTestData = freqLabels.map((label, idx) => ({
+    currentTestData = TARGET_FREQ_LABELS.map((label, idx) => ({
         freq: label,
         alpha: newData[idx],
         valid: lastValidationResult.isValid
@@ -256,7 +259,7 @@ function exportCSV() {
     });
     const link = document.createElement("a");
     link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", "iso10534_impedance_tube_data.csv");
+    link.setAttribute("download", "iso10534_observation_sheet_data.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -331,7 +334,7 @@ function loadHistoryItem(index) {
     absorptionChart.data.datasets[0].data = [...item.data];
     absorptionChart.update();
     lastValidationResult = { isValid: !!item.valid, accuracyScore: item.accuracy || 0 };
-    currentTestData = absorptionChart.data.labels.map((label, idx) => ({
+    currentTestData = TARGET_FREQ_LABELS.map((label, idx) => ({
         freq: label,
         alpha: item.data[idx],
         valid: !!item.valid
@@ -355,7 +358,7 @@ function openManuscriptModal(index) {
 
     const modalTbody = document.getElementById('modalDataTable');
     modalTbody.innerHTML = '';
-    absorptionChart.data.labels.forEach((label, idx) => {
+    TARGET_FREQ_LABELS.forEach((label, idx) => {
         const alphaVal = item.data[idx];
         const tr = document.createElement('tr');
         tr.className = 'border-b border-slate-100';
@@ -372,7 +375,7 @@ function openManuscriptModal(index) {
     manuscriptChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: absorptionChart.data.labels,
+            labels: TARGET_FREQ_LABELS,
             datasets: [{
                 label: `${item.name} (\u03b1)`,
                 data: item.data,
@@ -463,13 +466,14 @@ async function toggleAudioPlayback() {
         activeNode = sharedAudioCtx.createBufferSource();
         activeNode.buffer = noiseBuffer;
         activeNode.loop = true;
+        activeNoiseNode = activeNode;
         activeNode.connect(activeGainNode);
         activeNode.start();
     } else if (signalType === 'sweep') {
         activeNode = sharedAudioCtx.createOscillator();
         activeNode.type = 'sine';
-        activeNode.frequency.setValueAtTime(100, sharedAudioCtx.currentTime);
-        activeNode.frequency.exponentialRampToValueAtTime(3000, sharedAudioCtx.currentTime + 5);
+        activeNode.frequency.setValueAtTime(20, sharedAudioCtx.currentTime);
+        activeNode.frequency.exponentialRampToValueAtTime(2000, sharedAudioCtx.currentTime + 5);
         activeNode.connect(activeGainNode);
         activeNode.start();
     }
