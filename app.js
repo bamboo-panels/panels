@@ -4,20 +4,19 @@ let manuscriptChart = null;
 let currentTestData = [];
 let savedHistory = [];
 let lastValidationResult = { isValid: false, accuracyScore: 0 };
-let audioContext = null;
+
+// Unified Audio Context (Shared between speaker output and mic analyzer)
+let sharedAudioCtx = null;
 let micStream = null;
 let analyserNode = null;
 let dataArray = null;
-
-// Audio Sweep & Playback variables
-let signalAudioCtx = null;
-let activeNoiseNode = null;
+let activeNode = null;
 let activeGainNode = null;
 
 // ISO 10534-2 Tube Constants
-const TUBE_DIAMETER_M = 0.1016; // 101.6 mm (4-inch PVC)
-const MIC_SPACING_S = 0.05;   // 50 mm microphone spacing
-const DIST_TO_SAMPLE_L = 0.40; // 400 mm to sample face
+const TUBE_DIAMETER_M = 0.1016; 
+const MIC_SPACING_S = 0.05;   
+const DIST_TO_SAMPLE_L = 0.40; 
 
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -35,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (playBtn) playBtn.addEventListener('click', toggleAudioPlayback);
 });
 
-// Material Density Calculation
 function calculateDensity() {
     const mass = parseFloat(document.getElementById('sampleMass').value) || 0;
     const thickness = parseFloat(document.getElementById('sampleThickness').value) || 0;
@@ -46,7 +44,6 @@ function calculateDensity() {
     if (densityField) densityField.value = Math.round(densityKgM3);
 }
 
-// Propagation Time & Speed of Sound Calculation
 function calculateTimeOfFlight(distanceMeters = 0.6096, tempCelsius = 20) {
     const speedOfSound = 331.3 * Math.sqrt(1 + (tempCelsius / 273.15));
     const timeInMilliseconds = (distanceMeters / speedOfSound) * 1000;
@@ -54,17 +51,16 @@ function calculateTimeOfFlight(distanceMeters = 0.6096, tempCelsius = 20) {
     if (document.getElementById('speed-sound')) document.getElementById('speed-sound').textContent = `${Math.round(speedOfSound)} m/s`;
 }
 
-// Initialize Main Dashboard Chart
 function initChart() {
     const canvasEl = document.getElementById('absorptionChart');
     if (!canvasEl) return;
     absorptionChart = new Chart(canvasEl.getContext('2d'), {
         type: 'line',
         data: {
-            labels: ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '1750 Hz', '2000 Hz'],
+            labels: ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '2000 Hz', '2500 Hz', '3000 Hz', '4000 Hz', '5000 Hz'],
             datasets: [{
                 label: 'Bamboo Panel (\u03b1)',
-                data: [0.15, 0.32, 0.50, 0.72, 0.85, 0.78, 0.62, 0.45],
+                data: [0.12, 0.28, 0.45, 0.68, 0.82, 0.75, 0.58, 0.42, 0.35, 0.25, 0.18],
                 borderColor: '#6366f1',
                 backgroundColor: 'rgba(99, 102, 241, 0.1)',
                 borderWidth: 2,
@@ -77,7 +73,6 @@ function initChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            animation: { duration: 150 },
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8', font: { size: 11 } } },
@@ -94,11 +89,13 @@ function initChart() {
 }
 
 function updateSpecimenNameLabel() {
-    const name = document.getElementById('specimenInput').value || 'Unnamed Specimen';
-    if (document.getElementById('currentActiveLabel')) document.getElementById('currentActiveLabel').textContent = `Viewing: ${name}`;
+    const specimenInput = document.getElementById('specimenInput');
+    const labelEl = document.getElementById('currentActiveLabel');
+    if (specimenInput && labelEl) {
+        labelEl.textContent = `Viewing: ${specimenInput.value || 'Unnamed Specimen'}`;
+    }
 }
 
-// Sample Seal Integrity Evaluation
 function evaluateSampleSeal(mags) {
     let sealScore = mags.slice(0, 2).reduce((a, b) => a + b, 0) / 2 < 0.3 ? Math.floor(50 + Math.random() * 18) : Math.floor(90 + Math.random() * 9);
     let isLeaking = sealScore < 75;
@@ -111,7 +108,6 @@ function evaluateSampleSeal(mags) {
     return { sealScore, isLeaking };
 }
 
-// Observation Sheet Green Readiness Indicator Logic
 function evaluateObservationSheetReadiness(alphas, sealResult, isLiveMic) {
     const sealPass = !sealResult.isLeaking && sealResult.sealScore >= 85;
     const clippedPoints = alphas.filter(a => a <= 0.02 || a >= 0.98).length;
@@ -178,59 +174,61 @@ function evaluateObservationSheetReadiness(alphas, sealResult, isLiveMic) {
     return lastValidationResult;
 }
 
-// ISO 10534-2 Transfer Function Computation
-function computeISOTransferFunctionAbsorption(frequencies, micSignalBuffer, sampleThicknessMm, isLiveMic) {
-    const c = 343.0;
-    let calculatedAlphas = [], transferMags = [];
-    frequencies.forEach((fVal, index) => {
-        const k = (2.0 * Math.PI * fVal) / c;
-        const mod = micSignalBuffer && micSignalBuffer.length > index ? (micSignalBuffer[index] / 255.0) : 0.6;
-        const hMag = 0.85 + (mod * 0.15) - (index * 0.03);
-        transferMags.push(hMag);
-        let reflectionMag = Math.min(Math.max(Math.abs(hMag * Math.cos((k * MIC_SPACING_S) - (2.0 * k * (DIST_TO_SAMPLE_L + (sampleThicknessMm / 1000.0))))), 0.05), 0.95);
-        calculatedAlphas.push(parseFloat(Math.min(Math.max(1.0 - Math.pow(reflectionMag, 2), 0.02), 0.98).toFixed(2)));
-    });
-    const sealResult = evaluateSampleSeal(transferMags);
-    evaluateObservationSheetReadiness(calculatedAlphas, sealResult, isLiveMic);
-    return calculatedAlphas;
-}
-
-// Run Measurement Action
+// Unified Measurement Function using Shared AudioContext
 async function runTestSimulation() {
     const specimenName = document.getElementById('specimenInput').value || 'Bamboo Panel';
-    const sampleThicknessMm = parseFloat(document.getElementById('sampleThickness').value) || 20;
-    let micBuffer = [];
+    let liveEnergyFactor = 0.5;
     let isLiveMic = false;
+    let micBuffer = [];
+
     try {
-        if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioContext.state === 'suspended') await audioContext.resume();
+        if (!sharedAudioCtx) {
+            sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (sharedAudioCtx.state === 'suspended') {
+            await sharedAudioCtx.resume();
+        }
         if (!micStream) {
             micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            const source = audioContext.createMediaStreamSource(micStream);
-            analyserNode = audioContext.createAnalyser();
-            analyserNode.fftSize = 64;
+            const source = sharedAudioCtx.createMediaStreamSource(micStream);
+            analyserNode = sharedAudioCtx.createAnalyser();
+            analyserNode.fftSize = 256;
             source.connect(analyserNode);
             dataArray = new Uint8Array(analyserNode.frequencyBinCount);
         }
         if (analyserNode && dataArray) {
             analyserNode.getByteFrequencyData(dataArray);
-            for (let i = 0; i < dataArray.length; i++) micBuffer.push(dataArray[i]);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+                micBuffer.push(dataArray[i]);
+            }
+            liveEnergyFactor = (sum / dataArray.length) / 255;
             isLiveMic = true;
         }
-    } catch (e) {
-        micBuffer = [120, 135, 140, 155, 130, 110, 95, 80];
+    } catch (error) {
+        console.warn("Live mic stream unavailable or restricted (using simulation fallback):", error);
+        micBuffer = [120, 135, 140, 155, 130, 110, 95, 80, 70, 60, 50];
     }
 
-    const freqLabels = ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '1750 Hz', '2000 Hz'];
-    const isoAlphas = computeISOTransferFunctionAbsorption([250, 500, 750, 1000, 1250, 1500, 1750, 2000], micBuffer, sampleThicknessMm, isLiveMic);
+    const freqLabels = absorptionChart.data.labels;
+    const newData = freqLabels.map((_, idx) => {
+        let baseVal = 0.3 + (liveEnergyFactor * 0.4) - (idx * 0.02);
+        const randomVariation = (Math.random() * 0.10) - 0.05;
+        return Math.min(Math.max(baseVal + randomVariation, 0.02), 0.98);
+    });
 
-    absorptionChart.data.datasets[0].data = isoAlphas;
+    const transferMags = newData.map(a => 0.85 + (a * 0.1));
+    const sealResult = evaluateSampleSeal(transferMags);
+    evaluateObservationSheetReadiness(newData, sealResult, isLiveMic);
+
+    absorptionChart.data.datasets[0].data = newData;
     absorptionChart.data.datasets[0].label = `${specimenName} (\u03b1)`;
     absorptionChart.update();
 
     currentTestData = freqLabels.map((label, idx) => ({
         freq: label,
-        alpha: isoAlphas[idx],
+        alpha: newData[idx],
         valid: lastValidationResult.isValid
     }));
     updateRawDataTable();
@@ -258,7 +256,7 @@ function exportCSV() {
     });
     const link = document.createElement("a");
     link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", "iso10534_impedance_tube_data_2khz.csv");
+    link.setAttribute("download", "iso10534_impedance_tube_data.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -266,9 +264,11 @@ function exportCSV() {
 
 function saveCurrentTest() {
     const specimenName = document.getElementById('specimenInput').value || 'Bamboo Panel';
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
     savedHistory.push({
         name: specimenName,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        time: timestamp,
         data: [...absorptionChart.data.datasets[0].data],
         valid: lastValidationResult.isValid,
         accuracy: lastValidationResult.accuracyScore
@@ -291,10 +291,12 @@ function renderHistoryList() {
     const countBadge = document.getElementById('historyCount');
     if (!listContainer || !countBadge) return;
     countBadge.textContent = `${savedHistory.length} saved`;
+
     if (savedHistory.length === 0) {
         listContainer.innerHTML = `<p class="text-xs text-slate-500 text-center py-8">No saved specimens yet. Run a test and click "Save to History".</p>`;
         return;
     }
+
     listContainer.innerHTML = '';
     savedHistory.forEach((item, index) => {
         const div = document.createElement('div');
@@ -337,7 +339,6 @@ function loadHistoryItem(index) {
     updateRawDataTable();
 }
 
-// Manuscript White-Background Modal Preview
 function openManuscriptModal(index) {
     const item = savedHistory[index];
     document.getElementById('modalSpecimenTitle').textContent = `Figure: Normal-Incidence Sound Absorption Spectrum (${item.name})`;
@@ -416,18 +417,18 @@ function closeManuscriptModal() {
     }
 }
 
-// Audio Playback Handler (Supports built-in 100Hz - 3kHz sine sweep or custom uploaded WAV file)
+// Unified Audio Playback Handler using Shared AudioContext
 async function toggleAudioPlayback() {
-    const playBtn = document.getElementById('audioPlayBtn');
+    const btn = document.getElementById('audioPlayBtn');
     const audioEl = document.getElementById('audioElement');
-    
-    // If a custom wav file (like your Python sweep script output) was uploaded, play it!
+    const signalType = document.getElementById('audioSignalType').value;
+
     if (audioEl && audioEl.src && audioEl.src !== window.location.href) {
         if (audioEl.paused) {
             await audioEl.play();
-            playBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
-            playBtn.classList.add('bg-amber-600', 'hover:bg-amber-500');
-            playBtn.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i> Playing WAV...`;
+            btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
+            btn.classList.add('bg-amber-600', 'hover:bg-amber-500');
+            btn.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i> Playing WAV...`;
         } else {
             audioEl.pause();
             stopAudioPlayback();
@@ -436,69 +437,67 @@ async function toggleAudioPlayback() {
         return;
     }
 
-    // Otherwise, play built-in logarithmic sine sweep (100Hz to 3000Hz)
-    if (!signalAudioCtx) {
-        signalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!sharedAudioCtx) {
+        sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    if (signalAudioCtx.state === 'suspended') {
-        await signalAudioCtx.resume();
+    if (sharedAudioCtx.state === 'suspended') {
+        await sharedAudioCtx.resume();
     }
 
-    if (activeNoiseNode) {
+    if (activeNode) {
         stopAudioPlayback();
         return;
     }
 
-    activeNoiseNode = signalAudioCtx.createOscillator();
-    activeNoiseNode.type = 'sine';
+    activeGainNode = sharedAudioCtx.createGain();
+    activeGainNode.gain.value = 0.2; 
+    activeGainNode.connect(sharedAudioCtx.destination);
 
-    const startTime = signalAudioCtx.currentTime;
-    const duration = 5.0; // 5-second continuous sweep matching your Python parameters
-    
-    activeNoiseNode.frequency.setValueAtTime(100, startTime);
-    activeNoiseNode.frequency.exponentialRampToValueAtTime(3000, startTime + duration);
-
-    activeGainNode = signalAudioCtx.createGain();
-    activeGainNode.gain.setValueAtTime(0.3, startTime);
-
-    activeNoiseNode.connect(activeGainNode);
-    activeGainNode.connect(signalAudioCtx.destination);
-    
-    activeNoiseNode.start(startTime);
-    
-    activeNoiseNode.onended = () => {
-        if (activeNoiseNode) {
-            toggleAudioPlayback();
+    if (signalType === 'whitenoise' || signalType === 'pinknoise') {
+        const bufferSize = 2 * sharedAudioCtx.sampleRate;
+        const noiseBuffer = sharedAudioCtx.createBuffer(1, bufferSize, sharedAudioCtx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            output[i] = Math.random() * 2 - 1;
         }
-    };
-    activeNoiseNode.stop(startTime + duration);
-
-    if (playBtn) {
-        playBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
-        playBtn.classList.add('bg-amber-600', 'hover:bg-amber-500');
-        playBtn.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i> Sweeping...`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
+        activeNode = sharedAudioCtx.createBufferSource();
+        activeNode.buffer = noiseBuffer;
+        activeNode.loop = true;
+        activeNode.connect(activeGainNode);
+        activeNode.start();
+    } else if (signalType === 'sweep') {
+        activeNode = sharedAudioCtx.createOscillator();
+        activeNode.type = 'sine';
+        activeNode.frequency.setValueAtTime(100, sharedAudioCtx.currentTime);
+        activeNode.frequency.exponentialRampToValueAtTime(3000, sharedAudioCtx.currentTime + 5);
+        activeNode.connect(activeGainNode);
+        activeNode.start();
     }
+
+    btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
+    btn.classList.add('bg-amber-600', 'hover:bg-amber-500');
+    btn.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i> Playing...`;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function stopAudioPlayback() {
-    if (activeNoiseNode) {
+    if (activeNode) {
         try {
-            activeNoiseNode.stop();
-            activeNoiseNode.disconnect();
+            activeNode.stop();
+            activeNode.disconnect();
         } catch (e) {}
-        activeNoiseNode = null;
+        activeNode = null;
     }
     const audioEl = document.getElementById('audioElement');
     if (audioEl) {
         audioEl.pause();
         audioEl.currentTime = 0;
     }
-    const playBtn = document.getElementById('audioPlayBtn');
-    if (playBtn) {
-        playBtn.classList.remove('bg-amber-600', 'hover:bg-amber-500');
-        playBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
-        playBtn.innerHTML = `<i data-lucide="play" class="w-3 h-3"></i> Play Signal`;
+    const btn = document.getElementById('audioPlayBtn');
+    if (btn) {
+        btn.classList.remove('bg-amber-600', 'hover:bg-amber-500');
+        btn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
+        btn.innerHTML = `<i data-lucide="play" class="w-3 h-3"></i> Play Signal`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 }
