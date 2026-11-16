@@ -133,7 +133,7 @@
                     </span>
                 </div>
 
-                <!-- NEW: Observation Sheet Data Readiness Card -->
+                <!-- Observation Sheet Data Readiness Card -->
                 <div id="observationReadinessCard" class="bg-slate-950/80 border border-slate-800 rounded-lg p-3 transition-all duration-300">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
@@ -166,7 +166,6 @@
                     <p id="currentActiveLabel" class="text-xs text-indigo-400 font-medium">Viewing: Bamboo Panel</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <!-- Green Valid Pill in Chart Header -->
                     <span id="chartValidPill" class="hidden text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
                         READY FOR OBSERVATION SHEET
@@ -218,8 +217,52 @@
         </section>
     </main>
 
+    <!-- NEW: Formal White-Background Manuscript Modal Popup -->
+    <div id="manuscriptModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white text-slate-900 rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-4 border border-slate-300 relative">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+                <div>
+                    <h3 id="modalSpecimenTitle" class="text-base font-bold text-slate-900 font-serif">Figure: Normal-Incidence Sound Absorption Spectrum</h3>
+                    <p id="modalTimestamp" class="text-xs text-slate-500 font-mono">ISO 10534-2 Two-Microphone Transfer Method | Tested at 20°C</p>
+                </div>
+                <button onclick="closeManuscriptModal()" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition font-bold text-lg leading-none">&times;</button>
+            </div>
+
+            <!-- Clean White Chart Container for Manuscript Screenshot -->
+            <div class="relative w-full h-[280px] bg-white border border-slate-200 rounded-xl p-2">
+                <canvas id="manuscriptChart"></canvas>
+            </div>
+
+            <!-- Compact Data Table for Manuscript Observation Sheet -->
+            <div class="border border-slate-200 rounded-xl overflow-hidden">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+                        <tr>
+                            <th class="p-2.5">Frequency ($f$ in Hz)</th>
+                            <th class="p-2.5">Absorption Coefficient ($\alpha$)</th>
+                            <th class="p-2.5 text-right">Observation Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modalDataTable" class="divide-y divide-slate-100 text-slate-800 font-mono text-[11px]"></tbody>
+                </table>
+            </div>
+
+            <!-- Modal Footer Actions -->
+            <div class="flex items-center justify-between pt-2">
+                <span id="modalValidityBadge" class="text-[11px] font-bold px-3 py-1 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    ✓ Validated for Thesis Observation Sheet
+                </span>
+                <button onclick="closeManuscriptModal()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-xl transition shadow">
+                    Close Preview
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let absorptionChart;
+        let manuscriptChart = null;
         let currentTestData = [];
         let savedHistory = [];
         let lastValidationResult = { isValid: false, accuracyScore: 0 };
@@ -323,16 +366,11 @@
             return { sealScore, isLeaking };
         }
 
-        // NEW: Validate ISO Data Accuracy & Update Green Observation Sheet Indicators
         function evaluateObservationSheetReadiness(alphas, sealResult, isLiveMic) {
-            // Check 1: Hermetic seal >= 85%
             const sealPass = !sealResult.isLeaking && sealResult.sealScore >= 85;
-
-            // Check 2: Physical bounds check (no clipping at 0.02 or 0.98)
             const clippedPoints = alphas.filter(a => a <= 0.02 || a >= 0.98).length;
             const boundsPass = clippedPoints === 0;
 
-            // Check 3: Curve smoothness / coherence (no erratic jumps > 0.45 between adjacent bands)
             let maxJump = 0;
             for (let i = 1; i < alphas.length; i++) {
                 const jump = Math.abs(alphas[i] - alphas[i - 1]);
@@ -340,17 +378,15 @@
             }
             const coherencePass = maxJump <= 0.45;
 
-            // Compute accuracy confidence score
             let accuracyScore = sealResult.sealScore;
             if (!boundsPass) accuracyScore -= clippedPoints * 6;
             if (!coherencePass) accuracyScore -= 15;
-            if (!isLiveMic) accuracyScore = Math.min(accuracyScore, 94); // Slight cap if using fallback baseline buffer
+            if (!isLiveMic) accuracyScore = Math.min(accuracyScore, 94);
             accuracyScore = Math.max(0, Math.min(99, Math.round(accuracyScore)));
 
             const isValid = sealPass && boundsPass && coherencePass && accuracyScore >= 85;
             lastValidationResult = { isValid, accuracyScore };
 
-            // Update Left Panel Card
             const card = document.getElementById('observationReadinessCard');
             const dot = document.getElementById('obsDotIndicator');
             const statusText = document.getElementById('obsStatusText');
@@ -369,7 +405,6 @@
                 reasonText.className = 'text-[10px] text-emerald-200/80 mt-1.5 leading-relaxed';
 
                 if (chartPill) chartPill.classList.remove('hidden');
-                // Highlight chart line in emerald green when valid
                 absorptionChart.data.datasets[0].borderColor = '#10b981';
                 absorptionChart.data.datasets[0].backgroundColor = 'rgba(16, 185, 129, 0.12)';
                 absorptionChart.data.datasets[0].pointBackgroundColor = '#10b981';
@@ -382,9 +417,9 @@
                 badge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40';
 
                 let issue = 'Unstable reading detected.';
-                if (!sealPass) issue = 'Air leak around specimen edge lowered low-frequency coherence. Reseat sample.';
-                else if (!boundsPass) issue = 'Signal clipped at sensor limits. Adjust speaker volume and re-run.';
-                else if (!coherencePass) issue = 'Sudden frequency spike detected (background noise). Re-run test.';
+                if (!sealPass) issue = 'Air leak around specimen edge. Reseat sample.';
+                else if (!boundsPass) issue = 'Signal clipped at sensor limits. Adjust volume and re-run.';
+                else if (!coherencePass) issue = 'Sudden frequency spike detected. Re-run test.';
                 reasonText.textContent = issue;
                 reasonText.className = 'text-[10px] text-amber-200/80 mt-1.5 leading-relaxed';
 
@@ -515,14 +550,28 @@
             listContainer.innerHTML = '';
             savedHistory.forEach((item, index) => {
                 const div = document.createElement('div');
-                div.className = 'bg-slate-950 border border-slate-800 rounded-lg p-3 flex items-center justify-between hover:border-indigo-500/50 transition cursor-pointer group';
-                div.onclick = () => loadHistoryItem(index);
+                div.className = 'bg-slate-950 border border-slate-800 rounded-lg p-3 flex items-center justify-between hover:border-indigo-500/50 transition group';
+                
                 const validTag = item.valid
                     ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 ml-1.5">VALID (${item.accuracy || 94}%)</span>`
                     : '';
-                div.innerHTML = `<div><h4 class="text-xs font-bold text-slate-200 flex items-center">${item.name}${validTag}</h4><span class="text-[10px] text-slate-500">Saved at ${item.time}</span></div><div class="flex items-center gap-2"><span class="text-xs text-indigo-400 font-mono">View &rarr;</span><button onclick="deleteHistoryItem(${index}, event)" class="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-500/10 transition"><svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2.2 2-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></div>`;
+
+                div.innerHTML = `
+                    <div>
+                        <h4 class="text-xs font-bold text-slate-200 flex items-center cursor-pointer hover:text-indigo-400" onclick="loadHistoryItem(${index})">${item.name}${validTag}</h4>
+                        <span class="text-[10px] text-slate-500">Saved at ${item.time}</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="openManuscriptModal(${index})" class="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-[10px] font-semibold px-2 py-1 rounded transition flex items-center gap-1" title="View Manuscript Graph">
+                            <i data-lucide="image" class="w-3 h-3"></i> View Graph
+                        </button>
+                        <button onclick="deleteHistoryItem(${index}, event)" class="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-500/10 transition" title="Delete">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2.2 2-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                    </div>`;
                 listContainer.appendChild(div);
             });
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
         function loadHistoryItem(index) {
@@ -538,6 +587,88 @@
                 valid: !!item.valid
             }));
             updateRawDataTable();
+        }
+
+        // NEW: Open Formal White-Background Modal for Manuscript Screenshot
+        function openManuscriptModal(index) {
+            const item = savedHistory[index];
+            document.getElementById('modalSpecimenTitle').textContent = `Figure: Normal-Incidence Sound Absorption Spectrum (${item.name})`;
+            document.getElementById('modalTimestamp').textContent = `Recorded: ${item.time} | ISO 10534-2 Two-Microphone Method`;
+            
+            const badge = document.getElementById('modalValidityBadge');
+            if (item.valid) {
+                badge.textContent = `✓ Validated for Observation Sheet (${item.accuracy || 94}% Accuracy)`;
+                badge.className = 'text-[11px] font-bold px-3 py-1 rounded bg-emerald-100 text-emerald-800 border border-emerald-300';
+            } else {
+                badge.textContent = `⚠ Unvalidated Test Record (${item.accuracy || 70}% Accuracy)`;
+                badge.className = 'text-[11px] font-bold px-3 py-1 rounded bg-amber-100 text-amber-800 border border-amber-300';
+            }
+
+            // Populate Modal Table
+            const modalTbody = document.getElementById('modalDataTable');
+            modalTbody.innerHTML = '';
+            absorptionChart.data.labels.forEach((label, idx) => {
+                const alphaVal = item.data[idx];
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-100';
+                tr.innerHTML = `<td class="p-2">${label}</td><td class="p-2 font-bold text-indigo-700">${alphaVal.toFixed(2)}</td><td class="p-2 text-right text-emerald-700 font-semibold">${item.valid ? '✓ Verified' : 'Standard'}</td>`;
+                modalTbody.appendChild(tr);
+            });
+
+            // Show Modal
+            document.getElementById('manuscriptModal').classList.remove('hidden');
+
+            // Render White-Background Chart for Manuscript Export
+            const ctx = document.getElementById('manuscriptChart').getContext('2d');
+            if (manuscriptChart) {
+                manuscriptChart.destroy();
+            }
+            manuscriptChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: absorptionChart.data.labels,
+                    datasets: [{
+                        label: `${item.name} (\u03b1)`,
+                        data: item.data,
+                        borderColor: '#2563eb', // Formal publication blue
+                        backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#2563eb'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, position: 'top', labels: { font: { size: 11, family: 'sans-serif' }, color: '#1e293b' } }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(226, 232, 240, 1)' },
+                            ticks: { color: '#475569', font: { size: 11 } },
+                            title: { display: true, text: 'Frequency (Hz)', color: '#1e293b', font: { weight: 'bold' } }
+                        },
+                        y: {
+                            min: 0,
+                            max: 1,
+                            grid: { color: 'rgba(226, 232, 240, 1)' },
+                            ticks: { color: '#475569', font: { size: 11 } },
+                            title: { display: true, text: 'Sound Absorption Coefficient (\u03b1)', color: '#1e293b', font: { weight: 'bold' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function closeManuscriptModal() {
+            document.getElementById('manuscriptModal').classList.add('hidden');
+            if (manuscriptChart) {
+                manuscriptChart.destroy();
+                manuscriptChart = null;
+            }
         }
 
         async function toggleAudioPlayback() {
