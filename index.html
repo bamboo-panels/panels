@@ -97,7 +97,7 @@
                     <div>
                         <label class="block text-[10px] text-slate-500 mb-0.5">Signal Type / Audio File</label>
                         <select id="audioSignalType" class="w-full bg-dark-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
-                            <option value="sweep">Sine Sweep (100Hz - 3000Hz)</option>
+                            <option value="sweep">Sine Sweep (20Hz - 2000Hz)</option>
                             <option value="whitenoise">White Noise</option>
                             <option value="pinknoise">Pink Noise</option>
                         </select>
@@ -285,20 +285,23 @@
         let currentTestData = [];
         let savedHistory = [];
         let lastValidationResult = { isValid: false, accuracyScore: 0 };
-        let audioContext = null;
+
+        // Unified Audio Context (Shared between speaker output and mic analyzer)
+        let sharedAudioCtx = null;
         let micStream = null;
         let analyserNode = null;
         let dataArray = null;
-
-        // Audio Generator Variables
-        let signalAudioCtx = null;
-        let activeNoiseNode = null;
+        let activeNode = null;
         let activeGainNode = null;
 
         // Tube Geometry Constants (ISO 10534-2 Setup)
         const TUBE_DIAMETER_M = 0.1016; 
         const MIC_SPACING_S = 0.05;   
         const DIST_TO_SAMPLE_L = 0.40; 
+
+        // Observation Sheet Target Frequencies (250 Hz to 2000 Hz)
+        const TARGET_FREQUENCIES = [250, 500, 750, 1000, 1250, 1500, 1750, 2000];
+        const TARGET_FREQ_LABELS = ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '1750 Hz', '2000 Hz'];
 
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof lucide !== 'undefined') {
@@ -344,10 +347,10 @@
             absorptionChart = new Chart(canvasEl.getContext('2d'), {
                 type: 'line',
                 data: {
-                    labels: ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '2000 Hz', '2500 Hz', '3000 Hz', '4000 Hz', '5000 Hz'],
+                    labels: TARGET_FREQ_LABELS,
                     datasets: [{
                         label: 'Bamboo Panel (\u03b1)',
-                        data: [0.12, 0.28, 0.45, 0.68, 0.82, 0.75, 0.58, 0.42, 0.35, 0.25, 0.18],
+                        data: [0.15, 0.32, 0.50, 0.72, 0.85, 0.78, 0.62, 0.45],
                         borderColor: '#6366f1',
                         backgroundColor: 'rgba(99, 102, 241, 0.1)',
                         borderWidth: 2,
@@ -368,7 +371,7 @@
                 }
             });
 
-            currentTestData = absorptionChart.data.labels.map((label, idx) => ({
+            currentTestData = TARGET_FREQ_LABELS.map((label, idx) => ({
                 freq: label,
                 alpha: absorptionChart.data.datasets[0].data[idx],
                 valid: false
@@ -464,22 +467,21 @@
 
         async function runTestSimulation() {
             const specimenName = document.getElementById('specimenInput').value || 'Bamboo Panel';
-            const sampleThicknessMm = parseFloat(document.getElementById('sampleThickness').value) || 20;
             let liveEnergyFactor = 0.5;
             let isLiveMic = false;
             let micBuffer = [];
 
             try {
-                if (!audioContext) {
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (!sharedAudioCtx) {
+                    sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 }
-                if (audioContext.state === 'suspended') {
-                    await audioContext.resume();
+                if (sharedAudioCtx.state === 'suspended') {
+                    await sharedAudioCtx.resume();
                 }
                 if (!micStream) {
                     micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                    const source = audioContext.createMediaStreamSource(micStream);
-                    analyserNode = audioContext.createAnalyser();
+                    const source = sharedAudioCtx.createMediaStreamSource(micStream);
+                    analyserNode = sharedAudioCtx.createAnalyser();
                     analyserNode.fftSize = 256;
                     source.connect(analyserNode);
                     dataArray = new Uint8Array(analyserNode.frequencyBinCount);
@@ -496,17 +498,15 @@
                 }
             } catch (error) {
                 console.warn("Live mic stream unavailable or restricted (using simulation fallback):", error);
-                micBuffer = [120, 135, 140, 155, 130, 110, 95, 80, 70, 60, 50];
+                micBuffer = [120, 135, 140, 155, 130, 110, 95, 80];
             }
 
-            const freqLabels = absorptionChart.data.labels;
-            const newData = freqLabels.map((_, idx) => {
+            const newData = TARGET_FREQUENCIES.map((_, idx) => {
                 let baseVal = 0.3 + (liveEnergyFactor * 0.4) - (idx * 0.02);
                 const randomVariation = (Math.random() * 0.10) - 0.05;
-                return Math.min(Math.max(baseVal + randomVariation, 0.02), 0.98);
+                return parseFloat(Math.min(Math.max(baseVal + randomVariation, 0.02), 0.98).toFixed(2));
             });
 
-            // Transfer Mags for Seal Check
             const transferMags = newData.map(a => 0.85 + (a * 0.1));
             const sealResult = evaluateSampleSeal(transferMags);
             evaluateObservationSheetReadiness(newData, sealResult, isLiveMic);
@@ -515,7 +515,7 @@
             absorptionChart.data.datasets[0].label = `${specimenName} (\u03b1)`;
             absorptionChart.update();
 
-            currentTestData = freqLabels.map((label, idx) => ({
+            currentTestData = TARGET_FREQ_LABELS.map((label, idx) => ({
                 freq: label,
                 alpha: newData[idx],
                 valid: lastValidationResult.isValid
@@ -545,7 +545,7 @@
             });
             const link = document.createElement("a");
             link.setAttribute("href", encodeURI(csvContent));
-            link.setAttribute("download", "iso10534_impedance_tube_data.csv");
+            link.setAttribute("download", "iso10534_observation_sheet_data.csv");
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -620,7 +620,7 @@
             absorptionChart.data.datasets[0].data = [...item.data];
             absorptionChart.update();
             lastValidationResult = { isValid: !!item.valid, accuracyScore: item.accuracy || 0 };
-            currentTestData = absorptionChart.data.labels.map((label, idx) => ({
+            currentTestData = TARGET_FREQ_LABELS.map((label, idx) => ({
                 freq: label,
                 alpha: item.data[idx],
                 valid: !!item.valid
@@ -644,7 +644,7 @@
 
             const modalTbody = document.getElementById('modalDataTable');
             modalTbody.innerHTML = '';
-            absorptionChart.data.labels.forEach((label, idx) => {
+            TARGET_FREQ_LABELS.forEach((label, idx) => {
                 const alphaVal = item.data[idx];
                 const tr = document.createElement('tr');
                 tr.className = 'border-b border-slate-100';
@@ -661,7 +661,7 @@
             manuscriptChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: absorptionChart.data.labels,
+                    labels: TARGET_FREQ_LABELS,
                     datasets: [{
                         label: `${item.name} (\u03b1)`,
                         data: item.data,
@@ -706,7 +706,7 @@
             }
         }
 
-        // Audio Playback Handler (Supports custom uploaded WAV or built-in sweep/noise)
+        // Unified Audio Playback Handler using Shared AudioContext
         async function toggleAudioPlayback() {
             const btn = document.getElementById('audioPlayBtn');
             const audioEl = document.getElementById('audioElement');
@@ -726,41 +726,41 @@
                 return;
             }
 
-            if (!signalAudioCtx) {
-                signalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (!sharedAudioCtx) {
+                sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
-            if (signalAudioCtx.state === 'suspended') {
-                await signalAudioCtx.resume();
+            if (sharedAudioCtx.state === 'suspended') {
+                await sharedAudioCtx.resume();
             }
 
-            if (activeNoiseNode) {
+            if (activeNode) {
                 stopAudioPlayback();
                 return;
             }
 
-            activeGainNode = signalAudioCtx.createGain();
+            activeGainNode = sharedAudioCtx.createGain();
             activeGainNode.gain.value = 0.2; 
-            activeGainNode.connect(signalAudioCtx.destination);
+            activeGainNode.connect(sharedAudioCtx.destination);
 
             if (signalType === 'whitenoise' || signalType === 'pinknoise') {
-                const bufferSize = 2 * signalAudioCtx.sampleRate;
-                const noiseBuffer = signalAudioCtx.createBuffer(1, bufferSize, signalAudioCtx.sampleRate);
+                const bufferSize = 2 * sharedAudioCtx.sampleRate;
+                const noiseBuffer = sharedAudioCtx.createBuffer(1, bufferSize, sharedAudioCtx.sampleRate);
                 const output = noiseBuffer.getChannelData(0);
                 for (let i = 0; i < bufferSize; i++) {
                     output[i] = Math.random() * 2 - 1;
                 }
-                activeNoiseNode = signalAudioCtx.createBufferSource();
-                activeNoiseNode.buffer = noiseBuffer;
-                activeNoiseNode.loop = true;
-                activeNoiseNode.connect(activeGainNode);
-                activeNoiseNode.start();
+                activeNode = sharedAudioCtx.createBufferSource();
+                activeNode.buffer = noiseBuffer;
+                activeNode.loop = true;
+                activeNode.connect(activeGainNode);
+                activeNode.start();
             } else if (signalType === 'sweep') {
-                activeNoiseNode = signalAudioCtx.createOscillator();
-                activeNoiseNode.type = 'sine';
-                activeNoiseNode.frequency.setValueAtTime(100, signalAudioCtx.currentTime);
-                activeNoiseNode.frequency.exponentialRampToValueAtTime(3000, signalAudioCtx.currentTime + 5);
-                activeNoiseNode.connect(activeGainNode);
-                activeNoiseNode.start();
+                activeNode = sharedAudioCtx.createOscillator();
+                activeNode.type = 'sine';
+                activeNode.frequency.setValueAtTime(20, sharedAudioCtx.currentTime);
+                activeNode.frequency.exponentialRampToValueAtTime(2000, sharedAudioCtx.currentTime + 5);
+                activeNode.connect(activeGainNode);
+                activeNode.start();
             }
 
             btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
@@ -770,12 +770,12 @@
         }
 
         function stopAudioPlayback() {
-            if (activeNoiseNode) {
+            if (activeNode) {
                 try {
-                    activeNoiseNode.stop();
-                    activeNoiseNode.disconnect();
+                    activeNode.stop();
+                    activeNode.disconnect();
                 } catch (e) {}
-                activeNoiseNode = null;
+                activeNode = null;
             }
             const audioEl = document.getElementById('audioElement');
             if (audioEl) {
