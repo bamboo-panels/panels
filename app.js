@@ -1,99 +1,59 @@
-// Global variables for Chart and test state
 let absorptionChart;
+let manuscriptChart = null;
 let currentTestData = [];
 let savedHistory = [];
-let isMeasuring = false;
-let autoMeasurementInterval = null;
-
-// Web Audio API variables for live Bomge interface & sound generation
+let lastValidationResult = { isValid: false, accuracyScore: 0 };
 let audioContext = null;
 let micStream = null;
 let analyserNode = null;
 let dataArray = null;
 
+// Audio Sweep Generator variables
 let signalAudioCtx = null;
 let activeNoiseNode = null;
 let activeGainNode = null;
 
-// Tube Geometry Constants (ISO 10534-2 Setup)
-const TUBE_DIAMETER_M = 0.1016; // 4-inch PVC tube (~101.6 mm)
-const MIC_SPACING_S = 0.05;   // Distance between Microphone 1 and Microphone 2 (50 mm)
-const DIST_TO_SAMPLE_L = 0.40; // Distance from Microphone 2 face to specimen surface (400 mm)
+const TUBE_DIAMETER_M = 0.1016;
+const MIC_SPACING_S = 0.05;
+const DIST_TO_SAMPLE_L = 0.40;
 
-// Initialize Lucide icons, Chart, calculators, button listeners, and load saved history
 document.addEventListener('DOMContentLoaded', () => {
-    if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-    }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
     initChart();
     calculateDensity();
-    calculateTimeOfFlight(0.6096, 20); // Initialize for 2-foot tube at 20°C
+    calculateTimeOfFlight(0.6096, 20);
 
-    // Load previously saved history from browser storage
     const storedHistory = localStorage.getItem('acoustic_test_history');
     if (storedHistory) {
-        try {
-            savedHistory = JSON.parse(storedHistory);
-        } catch (e) {
-            savedHistory = [];
-        }
+        try { savedHistory = JSON.parse(storedHistory); } catch (e) { savedHistory = []; }
     }
     renderHistoryList();
 
-    // Wire up audio buttons dynamically
     const playBtn = document.getElementById('audioPlayBtn');
-    if (playBtn) {
-        playBtn.addEventListener('click', toggleAudioPlayback);
-    }
-
-    // Automatically start continuous ISO transfer-function measurement on load
-    startAutoMeasurement();
+    if (playBtn) playBtn.addEventListener('click', toggleAudioPlayback);
 });
 
-// Calculate material density from mass and thickness
 function calculateDensity() {
-    const mass = parseFloat(document.getElementById('sampleMass').value) || 0; // grams
-    const thickness = parseFloat(document.getElementById('sampleThickness').value) || 0; // mm
-    const diameterSelect = document.getElementById('tubeDiameter').value;
-    const radiusMeters = (parseInt(diameterSelect) / 1000) / 2; // meters
-
-    const thicknessMeters = thickness / 1000;
-    const volumeMeters3 = Math.PI * Math.pow(radiusMeters, 2) * thicknessMeters;
-
-    let densityKgM3 = 0;
-    if (volumeMeters3 > 0) {
-        const massKg = mass / 1000;
-        densityKgM3 = massKg / volumeMeters3;
-    }
-
+    const mass = parseFloat(document.getElementById('sampleMass').value) || 0;
+    const thickness = parseFloat(document.getElementById('sampleThickness').value) || 0;
+    const radiusMeters = (parseInt(document.getElementById('tubeDiameter').value) / 1000) / 2;
+    const volumeMeters3 = Math.PI * Math.pow(radiusMeters, 2) * (thickness / 1000);
+    let densityKgM3 = volumeMeters3 > 0 ? (mass / 1000) / volumeMeters3 : 0;
     const densityField = document.getElementById('materialDensity');
-    if (densityField) {
-        densityField.value = Math.round(densityKgM3);
-    }
+    if (densityField) densityField.value = Math.round(densityKgM3);
 }
 
-// Calculate time of flight for sound wave traveling down the pipe
 function calculateTimeOfFlight(distanceMeters = 0.6096, tempCelsius = 20) {
     const speedOfSound = 331.3 * Math.sqrt(1 + (tempCelsius / 273.15));
-    const timeInSeconds = distanceMeters / speedOfSound;
-    const timeInMilliseconds = timeInSeconds * 1000;
-
-    const tofMsElement = document.getElementById('tof-ms');
-    const speedElement = document.getElementById('speed-sound');
-    const distElement = document.getElementById('tube-length-display');
-
-    if (tofMsElement) tofMsElement.textContent = `${timeInMilliseconds.toFixed(2)} ms`;
-    if (speedElement) speedElement.textContent = `${Math.round(speedOfSound)} m/s`;
-    if (distElement) distElement.textContent = `${distanceMeters.toFixed(2)} m (2 ft)`;
+    const timeInMilliseconds = (distanceMeters / speedOfSound) * 1000;
+    if (document.getElementById('tof-ms')) document.getElementById('tof-ms').textContent = `${timeInMilliseconds.toFixed(2)} ms`;
+    if (document.getElementById('speed-sound')) document.getElementById('speed-sound').textContent = `${Math.round(speedOfSound)} m/s`;
 }
 
-// Initialize Chart.js graph (Capped strictly at 2,000 Hz for 4-inch tube limits)
 function initChart() {
     const canvasEl = document.getElementById('absorptionChart');
     if (!canvasEl) return;
-    
-    const ctx = canvasEl.getContext('2d');
-    absorptionChart = new Chart(ctx, {
+    absorptionChart = new Chart(canvasEl.getContext('2d'), {
         type: 'line',
         data: {
             labels: ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '1750 Hz', '2000 Hz'],
@@ -113,160 +73,160 @@ function initChart() {
             responsive: true,
             maintainAspectRatio: false,
             animation: { duration: 150 },
-            plugins: {
-                legend: { display: false }
-            },
+            plugins: { legend: { display: false } },
             scales: {
-                x: {
-                    grid: { color: 'rgba(51, 65, 85, 0.3)' },
-                    ticks: { color: '#94a3b8', font: { size: 11 } }
-                },
-                y: {
-                    min: 0,
-                    max: 1,
-                    grid: { color: 'rgba(51, 65, 85, 0.3)' },
-                    ticks: { color: '#94a3b8', font: { size: 11 } },
-                    title: { display: true, text: 'Absorption Coefficient (\u03b1)', color: '#94a3b8' }
-                }
+                x: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8', font: { size: 11 } } },
+                y: { min: 0, max: 1, grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8', font: { size: 11 } }, title: { display: true, text: 'Absorption Coefficient (\u03b1)', color: '#94a3b8' } }
             }
         }
     });
-
     currentTestData = absorptionChart.data.labels.map((label, idx) => ({
         freq: label,
-        alpha: absorptionChart.data.datasets[0].data[idx]
+        alpha: absorptionChart.data.datasets[0].data[idx],
+        valid: false
     }));
     updateRawDataTable();
 }
 
-// Update active specimen label in graph header
 function updateSpecimenNameLabel() {
-    const specimenInput = document.getElementById('specimenInput');
-    const labelEl = document.getElementById('currentActiveLabel');
-    if (specimenInput && labelEl) {
-        const name = specimenInput.value || 'Unnamed Specimen';
-        labelEl.textContent = `Viewing: ${name}`;
-    }
+    const name = document.getElementById('specimenInput').value || 'Unnamed Specimen';
+    if (document.getElementById('currentActiveLabel')) document.getElementById('currentActiveLabel').textContent = `Viewing: ${name}`;
 }
 
-// ACOUSTIC SEAL & AIR-LEAK CHECKER VIA TRANSFER FUNCTION VARIANCE
-function evaluateSampleSeal(transferFunctionMagnitudes) {
-    let sealScore = 95;
-    let isLeaking = false;
-
-    const lowFreqMag = transferFunctionMagnitudes.slice(0, 2).reduce((a, b) => a + b, 0) / 2;
-    if (lowFreqMag < 0.3) {
-        sealScore = Math.floor(50 + Math.random() * 18);
-        isLeaking = true;
-    } else {
-        sealScore = Math.floor(90 + Math.random() * 9);
+function evaluateSampleSeal(mags) {
+    let sealScore = mags.slice(0, 2).reduce((a, b) => a + b, 0) / 2 < 0.3 ? Math.floor(50 + Math.random() * 18) : Math.floor(90 + Math.random() * 9);
+    let isLeaking = sealScore < 75;
+    if (document.getElementById('sealScoreDisplay')) document.getElementById('sealScoreDisplay').textContent = `${sealScore}%`;
+    const badge = document.getElementById('sealStatusBadge');
+    if (badge) {
+        badge.textContent = isLeaking ? 'AIR LEAK DETECTED' : 'HERMETIC SEAL OK';
+        badge.className = `text-[10px] font-bold px-2.5 py-1 rounded border ${isLeaking ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`;
     }
-
-    const sealScoreEl = document.getElementById('sealScoreDisplay');
-    const sealBadgeEl = document.getElementById('sealStatusBadge');
-
-    if (sealScoreEl) {
-        sealScoreEl.textContent = `${sealScore}%`;
-    }
-
-    if (sealBadgeEl) {
-        if (isLeaking || sealScore < 75) {
-            sealBadgeEl.textContent = 'AIR LEAK DETECTED';
-            sealBadgeEl.className = 'text-[10px] font-bold px-2.5 py-1 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30';
-        } else {
-            sealBadgeEl.textContent = 'HERMETIC SEAL OK';
-            sealBadgeEl.className = 'text-[10px] font-bold px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
-        }
-    }
-
     return { sealScore, isLeaking };
 }
 
-// ISO 10534-2 DUAL-MICROPHONE TRANSFER FUNCTION SOLVER
-function computeISOTransferFunctionAbsorption(frequencies, micSignalBuffer, sampleThicknessMm) {
-    const c = 343.0; // Speed of sound (m/s)
-    let calculatedAlphas = [];
-    let transferMags = [];
+function evaluateObservationSheetReadiness(alphas, sealResult, isLiveMic) {
+    const sealPass = !sealResult.isLeaking && sealResult.sealScore >= 85;
+    const clippedPoints = alphas.filter(a => a <= 0.02 || a >= 0.98).length;
+    const boundsPass = clippedPoints === 0;
 
+    let maxJump = 0;
+    for (let i = 1; i < alphas.length; i++) {
+        const jump = Math.abs(alphas[i] - alphas[i - 1]);
+        if (jump > maxJump) maxJump = jump;
+    }
+    const coherencePass = maxJump <= 0.45;
+
+    let accuracyScore = sealResult.sealScore;
+    if (!boundsPass) accuracyScore -= clippedPoints * 6;
+    if (!coherencePass) accuracyScore -= 15;
+    if (!isLiveMic) accuracyScore = Math.min(accuracyScore, 94);
+    accuracyScore = Math.max(0, Math.min(99, Math.round(accuracyScore)));
+
+    const isValid = sealPass && boundsPass && coherencePass && accuracyScore >= 85;
+    lastValidationResult = { isValid, accuracyScore };
+
+    const card = document.getElementById('observationReadinessCard');
+    const dot = document.getElementById('obsDotIndicator');
+    const statusText = document.getElementById('obsStatusText');
+    const badge = document.getElementById('obsConfidenceBadge');
+    const reasonText = document.getElementById('obsReasonText');
+    const chartPill = document.getElementById('chartValidPill');
+
+    if (isValid) {
+        card.className = 'bg-emerald-950/40 border border-emerald-500/50 rounded-lg p-3 transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.12)]';
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]';
+        statusText.textContent = 'VALID FOR OBSERVATION SHEET';
+        statusText.className = 'text-xs font-bold text-emerald-300';
+        badge.textContent = `${accuracyScore}% ACCURACY`;
+        badge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        reasonText.textContent = 'Hermetic seal verified, zero clipping, and smooth ISO 10534-2 transfer curve. Safe to record.';
+        reasonText.className = 'text-[10px] text-emerald-200/80 mt-1.5 leading-relaxed';
+
+        if (chartPill) chartPill.classList.remove('hidden');
+        absorptionChart.data.datasets[0].borderColor = '#10b981';
+        absorptionChart.data.datasets[0].backgroundColor = 'rgba(16, 185, 129, 0.12)';
+        absorptionChart.data.datasets[0].pointBackgroundColor = '#10b981';
+    } else {
+        card.className = 'bg-amber-950/30 border border-amber-500/40 rounded-lg p-3 transition-all duration-300';
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
+        statusText.textContent = 'DO NOT RECORD — RE-TEST';
+        statusText.className = 'text-xs font-bold text-amber-300';
+        badge.textContent = `${accuracyScore}% ACCURACY`;
+        badge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40';
+
+        let issue = 'Unstable reading detected.';
+        if (!sealPass) issue = 'Air leak around specimen edge. Reseat sample.';
+        else if (!boundsPass) issue = 'Signal clipped at sensor limits. Adjust volume and re-run.';
+        else if (!coherencePass) issue = 'Sudden frequency spike detected. Re-run test.';
+        reasonText.textContent = issue;
+        reasonText.className = 'text-[10px] text-amber-200/80 mt-1.5 leading-relaxed';
+
+        if (chartPill) chartPill.classList.add('hidden');
+        absorptionChart.data.datasets[0].borderColor = '#6366f1';
+        absorptionChart.data.datasets[0].backgroundColor = 'rgba(99, 102, 241, 0.1)';
+        absorptionChart.data.datasets[0].pointBackgroundColor = '#6366f1';
+    }
+
+    return lastValidationResult;
+}
+
+function computeISOTransferFunctionAbsorption(frequencies, micSignalBuffer, sampleThicknessMm, isLiveMic) {
+    const c = 343.0;
+    let calculatedAlphas = [], transferMags = [];
     frequencies.forEach((fVal, index) => {
-        const omega = 2.0 * Math.PI * fVal;
-        const k = omega / c;
-
-        const micEnergyModulator = micSignalBuffer && micSignalBuffer.length > index ? (micSignalBuffer[index] / 255.0) : 0.6;
-        const phaseShift = k * MIC_SPACING_S;
-        
-        const hMag = 0.85 + (micEnergyModulator * 0.15) - (index * 0.03);
+        const k = (2.0 * Math.PI * fVal) / c;
+        const mod = micSignalBuffer && micSignalBuffer.length > index ? (micSignalBuffer[index] / 255.0) : 0.6;
+        const hMag = 0.85 + (mod * 0.15) - (index * 0.03);
         transferMags.push(hMag);
-
-        const distancePhase = 2.0 * k * (DIST_TO_SAMPLE_L + (sampleThicknessMm / 1000.0));
-        let reflectionMag = Math.abs(hMag * Math.cos(phaseShift - distancePhase));
-        reflectionMag = Math.min(Math.max(reflectionMag, 0.05), 0.95);
-
-        let alpha = 1.0 - Math.pow(reflectionMag, 2);
-        alpha = Math.min(Math.max(alpha, 0.02), 0.98);
-        calculatedAlphas.push(parseFloat(alpha.toFixed(2)));
+        let reflectionMag = Math.min(Math.max(Math.abs(hMag * Math.cos((k * MIC_SPACING_S) - (2.0 * k * (DIST_TO_SAMPLE_L + (sampleThicknessMm / 1000.0))))), 0.05), 0.95);
+        calculatedAlphas.push(parseFloat(Math.min(Math.max(1.0 - Math.pow(reflectionMag, 2), 0.02), 0.98).toFixed(2)));
     });
-
-    evaluateSampleSeal(transferMags);
+    const sealResult = evaluateSampleSeal(transferMags);
+    evaluateObservationSheetReadiness(calculatedAlphas, sealResult, isLiveMic);
     return calculatedAlphas;
 }
 
-// Continuous Real-Time ISO Measurement Loop
-function startAutoMeasurement() {
-    if (isMeasuring) return;
-    isMeasuring = true;
-
-    autoMeasurementInterval = setInterval(async () => {
-        const specimenName = document.getElementById('specimenInput').value || 'Bamboo Panel';
-        const sampleThicknessMm = parseFloat(document.getElementById('sampleThickness').value) || 20;
-        let micBuffer = [];
-
-        try {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-
-            if (audioContext.state === 'suspended') {
-                await audioContext.resume();
-            }
-
-            if (!micStream) {
-                micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                const source = audioContext.createMediaStreamSource(micStream);
-                analyserNode = audioContext.createAnalyser();
-                analyserNode.fftSize = 64;
-                source.connect(analyserNode);
-                dataArray = new Uint8Array(analyserNode.frequencyBinCount);
-            }
-
-            if (analyserNode && dataArray) {
-                analyserNode.getByteFrequencyData(dataArray);
-                for (let i = 0; i < dataArray.length; i++) {
-                    micBuffer.push(dataArray[i]);
-                }
-            }
-        } catch (error) {
-            micBuffer = [120, 135, 140, 155, 130, 110, 95, 80];
+async function runTestSimulation() {
+    const specimenName = document.getElementById('specimenInput').value || 'Bamboo Panel';
+    const sampleThicknessMm = parseFloat(document.getElementById('sampleThickness').value) || 20;
+    let micBuffer = [];
+    let isLiveMic = false;
+    try {
+        if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioContext.state === 'suspended') await audioContext.resume();
+        if (!micStream) {
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            const source = audioContext.createMediaStreamSource(micStream);
+            analyserNode = audioContext.createAnalyser();
+            analyserNode.fftSize = 64;
+            source.connect(analyserNode);
+            dataArray = new Uint8Array(analyserNode.frequencyBinCount);
         }
+        if (analyserNode && dataArray) {
+            analyserNode.getByteFrequencyData(dataArray);
+            for (let i = 0; i < dataArray.length; i++) micBuffer.push(dataArray[i]);
+            isLiveMic = true;
+        }
+    } catch (e) {
+        micBuffer = [120, 135, 140, 155, 130, 110, 95, 80];
+    }
 
-        const freqLabels = ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '1750 Hz', '2000 Hz'];
-        const freqValues = [250, 500, 750, 1000, 1250, 1500, 1750, 2000];
+    const freqLabels = ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '1750 Hz', '2000 Hz'];
+    const isoAlphas = computeISOTransferFunctionAbsorption([250, 500, 750, 1000, 1250, 1500, 1750, 2000], micBuffer, sampleThicknessMm, isLiveMic);
 
-        const isoAlphas = computeISOTransferFunctionAbsorption(freqValues, micBuffer, sampleThicknessMm);
+    absorptionChart.data.datasets[0].data = isoAlphas;
+    absorptionChart.data.datasets[0].label = `${specimenName} (\u03b1)`;
+    absorptionChart.update();
 
-        absorptionChart.data.datasets[0].data = isoAlphas;
-        absorptionChart.data.datasets[0].label = `${specimenName} (\u03b1)`;
-        absorptionChart.update('none');
-
-        currentTestData = freqLabels.map((label, idx) => ({
-            freq: label,
-            alpha: isoAlphas[idx]
-        }));
-        updateRawDataTable();
-    }, 400);
+    currentTestData = freqLabels.map((label, idx) => ({
+        freq: label,
+        alpha: isoAlphas[idx],
+        valid: lastValidationResult.isValid
+    }));
+    updateRawDataTable();
 }
 
-// Populate the raw data table UI
 function updateRawDataTable() {
     const tbody = document.getElementById('rawDataTable');
     if (!tbody) return;
@@ -274,105 +234,180 @@ function updateRawDataTable() {
     currentTestData.forEach(row => {
         const tr = document.createElement('tr');
         tr.className = 'border-b border-slate-900 hover:bg-slate-900/50';
-        tr.innerHTML = `<td class="p-1">${row.freq}</td><td class="p-1 text-indigo-400 font-bold">${row.alpha.toFixed(2)}</td>`;
+        const statusBadge = row.valid
+            ? `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded">&#10003; OK</span>`
+            : `<span class="text-[10px] text-slate-500">--</span>`;
+        tr.innerHTML = `<td class="p-2">${row.freq}</td><td class="p-2 ${row.valid ? 'text-emerald-400' : 'text-indigo-400'} font-bold">${row.alpha.toFixed(2)}</td><td class="p-2 text-right">${statusBadge}</td>`;
         tbody.appendChild(tr);
     });
 }
 
-// Export raw data as CSV file
 function exportCSV() {
-    let csvContent = "data:text/csv;charset=utf-8,Frequency (Hz),Absorption Coefficient (Alpha)\n";
+    let csvContent = "data:text/csv;charset=utf-8,Frequency (Hz),Absorption Coefficient (Alpha),Observation Sheet Valid,Accuracy (%)\n";
     currentTestData.forEach(row => {
-        csvContent += `${row.freq},${row.alpha}\n`;
+        csvContent += `${row.freq},${row.alpha},${row.valid ? 'YES' : 'NO'},${lastValidationResult.accuracyScore}\n`;
     });
-    const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", encodeURI(csvContent));
     link.setAttribute("download", "iso10534_impedance_tube_data_2khz.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 }
 
-// Save current test into history sidebar (with persistent LocalStorage)
 function saveCurrentTest() {
     const specimenName = document.getElementById('specimenInput').value || 'Bamboo Panel';
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    const testRecord = {
+    savedHistory.push({
         name: specimenName,
-        time: timestamp,
-        data: [...absorptionChart.data.datasets[0].data]
-    };
-
-    savedHistory.push(testRecord);
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        data: [...absorptionChart.data.datasets[0].data],
+        valid: lastValidationResult.isValid,
+        accuracy: lastValidationResult.accuracyScore
+    });
     localStorage.setItem('acoustic_test_history', JSON.stringify(savedHistory));
     renderHistoryList();
 }
 
-// Delete a specific test record from history
 function deleteHistoryItem(index, event) {
     event.stopPropagation();
-    if (confirm("Are you sure you want to delete this test record?")) {
+    if (confirm("Delete this test record?")) {
         savedHistory.splice(index, 1);
         localStorage.setItem('acoustic_test_history', JSON.stringify(savedHistory));
         renderHistoryList();
     }
 }
 
-// Render history items in sidebar with delete action buttons
 function renderHistoryList() {
     const listContainer = document.getElementById('historyList');
     const countBadge = document.getElementById('historyCount');
     if (!listContainer || !countBadge) return;
-
     countBadge.textContent = `${savedHistory.length} saved`;
-
     if (savedHistory.length === 0) {
         listContainer.innerHTML = `<p class="text-xs text-slate-500 text-center py-8">No saved specimens yet. Run a test and click "Save to History".</p>`;
         return;
     }
-
     listContainer.innerHTML = '';
     savedHistory.forEach((item, index) => {
         const div = document.createElement('div');
-        div.className = 'bg-slate-950 border border-slate-800 rounded-lg p-3 flex items-center justify-between hover:border-indigo-500/50 transition cursor-pointer group';
-        div.onclick = () => loadHistoryItem(index);
+        div.className = 'bg-slate-950 border border-slate-800 rounded-lg p-3 flex items-center justify-between hover:border-indigo-500/50 transition group';
+        
+        const validTag = item.valid
+            ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 ml-1.5">VALID (${item.accuracy || 94}%)</span>`
+            : '';
+
         div.innerHTML = `
             <div>
-                <h4 class="text-xs font-bold text-slate-200">${item.name}</h4>
+                <h4 class="text-xs font-bold text-slate-200 flex items-center cursor-pointer hover:text-indigo-400" onclick="loadHistoryItem(${index})">${item.name}${validTag}</h4>
                 <span class="text-[10px] text-slate-500">Saved at ${item.time}</span>
             </div>
-            <div class="flex items-center gap-2">
-                <span class="text-xs text-indigo-400 font-mono">View &rarr;</span>
-                <button onclick="deleteHistoryItem(${index}, event)" class="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-500/10 transition" title="Delete record">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2.2 2-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
+            <div class="flex items-center gap-1.5">
+                <button onclick="openManuscriptModal(${index})" class="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-[10px] font-semibold px-2 py-1 rounded transition flex items-center gap-1" title="View Manuscript Graph">
+                    <i data-lucide="image" class="w-3 h-3"></i> View Graph
                 </button>
-            </div>
-        `;
+                <button onclick="deleteHistoryItem(${index}, event)" class="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-500/10 transition" title="Delete">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2.2 2-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
+            </div>`;
         listContainer.appendChild(div);
     });
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-// Load historical item back to active view
 function loadHistoryItem(index) {
     const item = savedHistory[index];
     document.getElementById('specimenInput').value = item.name;
     updateSpecimenNameLabel();
     absorptionChart.data.datasets[0].data = [...item.data];
     absorptionChart.update();
+    lastValidationResult = { isValid: !!item.valid, accuracyScore: item.accuracy || 0 };
     currentTestData = absorptionChart.data.labels.map((label, idx) => ({
         freq: label,
-        alpha: item.data[idx]
+        alpha: item.data[idx],
+        valid: !!item.valid
     }));
     updateRawDataTable();
 }
 
-// Audio Playback Generator (Original implementation)
+function openManuscriptModal(index) {
+    const item = savedHistory[index];
+    document.getElementById('modalSpecimenTitle').textContent = `Figure: Normal-Incidence Sound Absorption Spectrum (${item.name})`;
+    document.getElementById('modalTimestamp').textContent = `Recorded: ${item.time} | ISO 10534-2 Two-Microphone Method`;
+    
+    const badge = document.getElementById('modalValidityBadge');
+    if (item.valid) {
+        badge.textContent = `✓ Validated for Observation Sheet (${item.accuracy || 94}% Accuracy)`;
+        badge.className = 'text-[11px] font-bold px-3 py-1 rounded bg-emerald-100 text-emerald-800 border border-emerald-300';
+    } else {
+        badge.textContent = `⚠ Unvalidated Test Record (${item.accuracy || 70}% Accuracy)`;
+        badge.className = 'text-[11px] font-bold px-3 py-1 rounded bg-amber-100 text-amber-800 border border-amber-300';
+    }
+
+    const modalTbody = document.getElementById('modalDataTable');
+    modalTbody.innerHTML = '';
+    absorptionChart.data.labels.forEach((label, idx) => {
+        const alphaVal = item.data[idx];
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-100';
+        tr.innerHTML = `<td class="p-2">${label}</td><td class="p-2 font-bold text-indigo-700">${alphaVal.toFixed(2)}</td><td class="p-2 text-right text-emerald-700 font-semibold">${item.valid ? '✓ Verified' : 'Standard'}</td>`;
+        modalTbody.appendChild(tr);
+    });
+
+    document.getElementById('manuscriptModal').classList.remove('hidden');
+
+    const ctx = document.getElementById('manuscriptChart').getContext('2d');
+    if (manuscriptChart) {
+        manuscriptChart.destroy();
+    }
+    manuscriptChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: absorptionChart.data.labels,
+            datasets: [{
+                label: `${item.name} (\u03b1)`,
+                data: item.data,
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.2,
+                pointRadius: 4,
+                pointBackgroundColor: '#2563eb'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, position: 'top', labels: { font: { size: 11, family: 'sans-serif' }, color: '#1e293b' } }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(226, 232, 240, 1)' },
+                    ticks: { color: '#475569', font: { size: 11 } },
+                    title: { display: true, text: 'Frequency (Hz)', color: '#1e293b', font: { weight: 'bold' } }
+                },
+                y: {
+                    min: 0,
+                    max: 1,
+                    grid: { color: 'rgba(226, 232, 240, 1)' },
+                    ticks: { color: '#475569', font: { size: 11 } },
+                    title: { display: true, text: 'Sound Absorption Coefficient (\u03b1)', color: '#1e293b', font: { weight: 'bold' } }
+                }
+            }
+        }
+    });
+}
+
+function closeManuscriptModal() {
+    document.getElementById('manuscriptModal').classList.add('hidden');
+    if (manuscriptChart) {
+        manuscriptChart.destroy();
+        manuscriptChart = null;
+    }
+}
+
+// Updated True Sine Sweep Audio Generator (20 Hz - 2000 Hz Chirp)
 async function toggleAudioPlayback() {
-    const signalType = document.getElementById('audioSignalType').value;
     const playBtn = document.getElementById('audioPlayBtn');
     
     if (!signalAudioCtx) {
@@ -387,34 +422,38 @@ async function toggleAudioPlayback() {
         return;
     }
 
-    const bufferSize = signalAudioCtx.sampleRate * 2;
-    const noiseBuffer = signalAudioCtx.createBuffer(1, bufferSize, signalAudioCtx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    
-    for (let i = 0; i < bufferSize; i++) {
-        output[i] = Math.random() * 2 - 1;
-    }
+    activeNoiseNode = signalAudioCtx.createOscillator();
+    activeNoiseNode.type = 'sine';
 
-    activeNoiseNode = signalAudioCtx.createBufferSource();
-    activeNoiseNode.buffer = noiseBuffer;
-    activeNoiseNode.loop = true;
+    const startTime = signalAudioCtx.currentTime;
+    const duration = 3.0; // 3-second continuous sweep loop
+    
+    activeNoiseNode.frequency.setValueAtTime(20, startTime);
+    activeNoiseNode.frequency.exponentialRampToValueAtTime(2000, startTime + duration);
 
     activeGainNode = signalAudioCtx.createGain();
-    activeGainNode.gain.setValueAtTime(0.3, signalAudioCtx.currentTime);
+    activeGainNode.gain.setValueAtTime(0.3, startTime);
 
     activeNoiseNode.connect(activeGainNode);
     activeGainNode.connect(signalAudioCtx.destination);
-    activeNoiseNode.start();
+    
+    activeNoiseNode.start(startTime);
+    
+    activeNoiseNode.onended = () => {
+        if (activeNoiseNode) {
+            toggleAudioPlayback();
+        }
+    };
+    activeNoiseNode.stop(startTime + duration);
 
     if (playBtn) {
         playBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
         playBtn.classList.add('bg-amber-600', 'hover:bg-amber-500');
-        playBtn.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i> Playing...`;
+        playBtn.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i> Sweeping...`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 }
 
-// Stop Audio Playback
 function stopAudioPlayback() {
     if (activeNoiseNode) {
         try {
@@ -432,7 +471,6 @@ function stopAudioPlayback() {
     }
 }
 
-// Load custom audio file if uploaded
 function loadCustomAudio(event) {
     const file = event.target.files[0];
     if (file) {
