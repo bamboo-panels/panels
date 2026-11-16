@@ -80,7 +80,7 @@
                         </div>
                         <div>
                             <label class="block text-[10px] text-slate-500 mb-0.5">Thickness (mm)</label>
-                            <input type="number" id="sampleThickness" value="20" oninput="calculateDensity()" class="w-full bg-dark-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <input type="number" id="sampleThickness" value="20" oninput="calculateDensity(); calculateTimeOfFlight(20);" class="w-full bg-dark-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
                         </div>
                     </div>
                     <div>
@@ -123,11 +123,11 @@
                 <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 flex items-center justify-between">
                     <div>
                         <span class="text-[10px] text-slate-500 uppercase font-mono block">Propagation Time</span>
-                        <span id="tof-ms" class="text-sm font-bold text-indigo-400 font-mono">1.78 ms</span>
+                        <span id="tof-ms" class="text-sm font-bold text-indigo-400 font-mono">-- ms</span>
                     </div>
                     <div class="text-right">
                         <span class="text-[10px] text-slate-500 uppercase font-mono block">Speed of Sound</span>
-                        <span id="speed-sound" class="text-sm font-bold text-slate-200 font-mono">343 m/s</span>
+                        <span id="speed-sound" class="text-sm font-bold text-slate-200 font-mono">-- m/s</span>
                     </div>
                 </div>
 
@@ -309,7 +309,7 @@
             }
             initChart();
             calculateDensity();
-            calculateTimeOfFlight(0.6096, 20);
+            calculateTimeOfFlight(20);
 
             const storedHistory = localStorage.getItem('acoustic_test_history');
             if (storedHistory) {
@@ -333,11 +333,17 @@
             if (densityField) densityField.value = Math.round(densityKgM3);
         }
 
-        function calculateTimeOfFlight(distanceMeters = 0.6096, tempCelsius = 20) {
+        function calculateTimeOfFlight(tempCelsius = 20) {
             const speedOfSound = 331.3 * Math.sqrt(1 + (tempCelsius / 273.15));
-            const timeInMilliseconds = (distanceMeters / speedOfSound) * 1000;
-            if (document.getElementById('tof-ms')) document.getElementById('tof-ms').textContent = `${timeInMilliseconds.toFixed(2)} ms`;
-            if (document.getElementById('speed-sound')) document.getElementById('speed-sound').textContent = `${Math.round(speedOfSound)} m/s`;
+            const sampleThicknessMm = parseFloat(document.getElementById('sampleThickness').value) || 20;
+            const totalDistanceMeters = DIST_TO_SAMPLE_L + (sampleThicknessMm / 1000); 
+            const timeInMilliseconds = (totalDistanceMeters / speedOfSound) * 1000;
+
+            const tofEl = document.getElementById('tof-ms');
+            const speedEl = document.getElementById('speed-sound');
+            
+            if (tofEl) tofEl.textContent = `${timeInMilliseconds.toFixed(2)} ms`;
+            if (speedEl) speedEl.textContent = `${Math.round(speedOfSound)} m/s`;
         }
 
         function initChart() {
