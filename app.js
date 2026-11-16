@@ -1,3 +1,4 @@
+// Global state variables
 let absorptionChart;
 let manuscriptChart = null;
 let currentTestData = [];
@@ -8,14 +9,15 @@ let micStream = null;
 let analyserNode = null;
 let dataArray = null;
 
-// Audio Sweep Generator variables
+// Audio Sweep & Playback variables
 let signalAudioCtx = null;
 let activeNoiseNode = null;
 let activeGainNode = null;
 
-const TUBE_DIAMETER_M = 0.1016;
-const MIC_SPACING_S = 0.05;
-const DIST_TO_SAMPLE_L = 0.40;
+// ISO 10534-2 Tube Constants
+const TUBE_DIAMETER_M = 0.1016; // 101.6 mm (4-inch PVC)
+const MIC_SPACING_S = 0.05;   // 50 mm microphone spacing
+const DIST_TO_SAMPLE_L = 0.40; // 400 mm to sample face
 
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -33,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (playBtn) playBtn.addEventListener('click', toggleAudioPlayback);
 });
 
+// Material Density Calculation
 function calculateDensity() {
     const mass = parseFloat(document.getElementById('sampleMass').value) || 0;
     const thickness = parseFloat(document.getElementById('sampleThickness').value) || 0;
@@ -43,6 +46,7 @@ function calculateDensity() {
     if (densityField) densityField.value = Math.round(densityKgM3);
 }
 
+// Propagation Time & Speed of Sound Calculation
 function calculateTimeOfFlight(distanceMeters = 0.6096, tempCelsius = 20) {
     const speedOfSound = 331.3 * Math.sqrt(1 + (tempCelsius / 273.15));
     const timeInMilliseconds = (distanceMeters / speedOfSound) * 1000;
@@ -50,6 +54,7 @@ function calculateTimeOfFlight(distanceMeters = 0.6096, tempCelsius = 20) {
     if (document.getElementById('speed-sound')) document.getElementById('speed-sound').textContent = `${Math.round(speedOfSound)} m/s`;
 }
 
+// Initialize Main Dashboard Chart
 function initChart() {
     const canvasEl = document.getElementById('absorptionChart');
     if (!canvasEl) return;
@@ -93,6 +98,7 @@ function updateSpecimenNameLabel() {
     if (document.getElementById('currentActiveLabel')) document.getElementById('currentActiveLabel').textContent = `Viewing: ${name}`;
 }
 
+// Sample Seal Integrity Evaluation
 function evaluateSampleSeal(mags) {
     let sealScore = mags.slice(0, 2).reduce((a, b) => a + b, 0) / 2 < 0.3 ? Math.floor(50 + Math.random() * 18) : Math.floor(90 + Math.random() * 9);
     let isLeaking = sealScore < 75;
@@ -105,6 +111,7 @@ function evaluateSampleSeal(mags) {
     return { sealScore, isLeaking };
 }
 
+// Observation Sheet Green Readiness Indicator Logic
 function evaluateObservationSheetReadiness(alphas, sealResult, isLiveMic) {
     const sealPass = !sealResult.isLeaking && sealResult.sealScore >= 85;
     const clippedPoints = alphas.filter(a => a <= 0.02 || a >= 0.98).length;
@@ -171,6 +178,7 @@ function evaluateObservationSheetReadiness(alphas, sealResult, isLiveMic) {
     return lastValidationResult;
 }
 
+// ISO 10534-2 Transfer Function Computation
 function computeISOTransferFunctionAbsorption(frequencies, micSignalBuffer, sampleThicknessMm, isLiveMic) {
     const c = 343.0;
     let calculatedAlphas = [], transferMags = [];
@@ -187,6 +195,7 @@ function computeISOTransferFunctionAbsorption(frequencies, micSignalBuffer, samp
     return calculatedAlphas;
 }
 
+// Run Measurement Action
 async function runTestSimulation() {
     const specimenName = document.getElementById('specimenInput').value || 'Bamboo Panel';
     const sampleThicknessMm = parseFloat(document.getElementById('sampleThickness').value) || 20;
@@ -328,6 +337,7 @@ function loadHistoryItem(index) {
     updateRawDataTable();
 }
 
+// Manuscript White-Background Modal Preview
 function openManuscriptModal(index) {
     const item = savedHistory[index];
     document.getElementById('modalSpecimenTitle').textContent = `Figure: Normal-Incidence Sound Absorption Spectrum (${item.name})`;
@@ -406,10 +416,27 @@ function closeManuscriptModal() {
     }
 }
 
-// Updated True Sine Sweep Audio Generator (20 Hz - 2000 Hz Chirp)
+// Audio Playback Handler (Supports built-in 100Hz - 3kHz sine sweep or custom uploaded WAV file)
 async function toggleAudioPlayback() {
     const playBtn = document.getElementById('audioPlayBtn');
+    const audioEl = document.getElementById('audioElement');
     
+    // If a custom wav file (like your Python sweep script output) was uploaded, play it!
+    if (audioEl && audioEl.src && audioEl.src !== window.location.href) {
+        if (audioEl.paused) {
+            await audioEl.play();
+            playBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
+            playBtn.classList.add('bg-amber-600', 'hover:bg-amber-500');
+            playBtn.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i> Playing WAV...`;
+        } else {
+            audioEl.pause();
+            stopAudioPlayback();
+        }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        return;
+    }
+
+    // Otherwise, play built-in logarithmic sine sweep (100Hz to 3000Hz)
     if (!signalAudioCtx) {
         signalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
@@ -426,10 +453,10 @@ async function toggleAudioPlayback() {
     activeNoiseNode.type = 'sine';
 
     const startTime = signalAudioCtx.currentTime;
-    const duration = 3.0; // 3-second continuous sweep loop
+    const duration = 5.0; // 5-second continuous sweep matching your Python parameters
     
-    activeNoiseNode.frequency.setValueAtTime(20, startTime);
-    activeNoiseNode.frequency.exponentialRampToValueAtTime(2000, startTime + duration);
+    activeNoiseNode.frequency.setValueAtTime(100, startTime);
+    activeNoiseNode.frequency.exponentialRampToValueAtTime(3000, startTime + duration);
 
     activeGainNode = signalAudioCtx.createGain();
     activeGainNode.gain.setValueAtTime(0.3, startTime);
@@ -462,6 +489,11 @@ function stopAudioPlayback() {
         } catch (e) {}
         activeNoiseNode = null;
     }
+    const audioEl = document.getElementById('audioElement');
+    if (audioEl) {
+        audioEl.pause();
+        audioEl.currentTime = 0;
+    }
     const playBtn = document.getElementById('audioPlayBtn');
     if (playBtn) {
         playBtn.classList.remove('bg-amber-600', 'hover:bg-amber-500');
@@ -478,7 +510,7 @@ function loadCustomAudio(event) {
         if (audioEl) {
             audioEl.src = URL.createObjectURL(file);
             audioEl.load();
-            alert(`Loaded audio file: ${file.name}`);
+            alert(`Successfully loaded custom audio file: ${file.name}`);
         }
     }
 }
