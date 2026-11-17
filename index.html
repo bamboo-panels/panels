@@ -161,6 +161,27 @@
                     </p>
                 </div>
 
+                <div class="bg-slate-950/60 border border-amber-500/30 rounded-lg p-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-[10px] text-slate-300 uppercase font-mono">Microphone Pair Calibration</span>
+                        <span id="micCalibrationBadge" class="text-[9px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">NOT CALIBRATED</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+                        Capture once in the normal positions, then swap the microphones between ports and capture again. Keep channel 1 assigned to the speaker-side port and channel 2 to the sample-side port.
+                    </p>
+                    <div class="flex items-center gap-2 mt-2">
+                        <button id="micCalibrationBtn" onclick="runMicCalibrationStep()" class="flex-1 bg-amber-600/80 hover:bg-amber-500 text-white text-[10px] font-semibold py-1.5 px-2 rounded transition">
+                            Capture Normal Positions (Step 1)
+                        </button>
+                        <button onclick="clearMicCalibration()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold py-1.5 px-2 rounded transition">
+                            Clear
+                        </button>
+                    </div>
+                    <p id="micCalibrationStatus" aria-live="polite" class="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
+                        Keep the sample, speaker, gains, and tube geometry unchanged during both captures.
+                    </p>
+                </div>
+
                 <!-- Run Measurement Button -->
                 <button id="measureBtn" onclick="runHardwareMeasurement()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs py-2.5 rounded-lg transition shadow-md flex items-center justify-center gap-2">
                     <i data-lucide="activity" class="w-4 h-4"></i> Run Live Hardware Measurement (5s)
@@ -266,6 +287,8 @@
         let currentTestData = [];
         let savedHistory = [];
         let lastValidationResult = { isValid: false, accuracyScore: 0 };
+        let micCalibration = null;
+        let calibrationFirstTransfer = null;
         let testAudioContext = null;
         let testAudioSource = null;
         let testAudioGain = null;
@@ -283,6 +306,7 @@
             if (storedHistory) {
                 try { savedHistory = JSON.parse(storedHistory); } catch (e) { savedHistory = []; }
             }
+            loadMicCalibration();
             renderHistoryList();
         });
 
@@ -304,6 +328,152 @@
 
             document.getElementById('tof-ms').textContent = `${timeInMilliseconds.toFixed(2)} ms`;
             document.getElementById('speed-sound').textContent = `${speedOfSound.toFixed(1)} m/s`;
+        }
+
+        function isValidComplexSpectrum(values) {
+            return Array.isArray(values) &&
+                values.length === TARGET_FREQ_LABELS.length &&
+                values.every(pair => Array.isArray(pair) &&
+                    pair.length === 2 &&
+                    pair.every(Number.isFinite));
+        }
+
+        function refreshMicCalibrationControls() {
+            const button = document.getElementById('micCalibrationBtn');
+            const badge = document.getElementById('micCalibrationBadge');
+            if (calibrationFirstTransfer) {
+                button.textContent = 'Capture Swapped Positions (Step 2)';
+            } else if (micCalibration) {
+                button.textContent = 'Recalibrate Microphones (Step 1)';
+            } else {
+                button.textContent = 'Capture Normal Positions (Step 1)';
+            }
+
+            if (micCalibration) {
+                badge.textContent = 'CALIBRATED';
+                badge.className = 'text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+            } else {
+                badge.textContent = 'NOT CALIBRATED';
+                badge.className = 'text-[9px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
+            }
+        }
+
+        function loadMicCalibration() {
+            const stored = localStorage.getItem('biohush_mic_calibration');
+            if (!stored) {
+                refreshMicCalibrationControls();
+                return;
+            }
+
+            try {
+                const parsed = JSON.parse(stored);
+                if (!isValidComplexSpectrum(parsed)) {
+                    throw new Error('Saved calibration has an invalid format.');
+                }
+                micCalibration = parsed;
+                document.getElementById('micCalibrationStatus').textContent =
+                    'Saved calibration loaded. Restore the microphones to their normal positions before measuring.';
+            } catch (error) {
+                document.getElementById('micCalibrationStatus').textContent =
+                    `Saved calibration could not be loaded: ${error.message}`;
+            }
+            refreshMicCalibrationControls();
+        }
+
+        function clearMicCalibration() {
+            try {
+                localStorage.removeItem('biohush_mic_calibration');
+            } catch (error) {
+                document.getElementById('micCalibrationStatus').textContent =
+                    `Could not clear saved calibration: ${error.message}`;
+                return;
+            }
+            micCalibration = null;
+            calibrationFirstTransfer = null;
+            document.getElementById('micCalibrationStatus').textContent =
+                'Calibration cleared. Keep the sample, speaker, gains, and tube geometry unchanged during both captures.';
+            refreshMicCalibrationControls();
+        }
+
+        async function requestHardwareMeasurement(calibration) {
+            if (testAudioSource) stopTestSignal();
+            const temp = parseFloat(document.getElementById('roomTemp').value) || 28;
+            const thickness = parseFloat(document.getElementById('sampleThickness').value) || 15;
+            const body = { temp, thickness };
+            if (calibration) body.micCalibration = calibration;
+
+            const response = await fetch('http://127.0.0.1:5000/measure', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const result = await response.json();
+            if (!response.ok || result.status !== 'ok') {
+                throw new Error(result.message || 'Hardware measurement failed.');
+            }
+            return result;
+        }
+
+        async function runMicCalibrationStep() {
+            const calibrationButton = document.getElementById('micCalibrationBtn');
+            const measureButton = document.getElementById('measureBtn');
+            const status = document.getElementById('micCalibrationStatus');
+            calibrationButton.disabled = true;
+            measureButton.disabled = true;
+            calibrationButton.classList.add('opacity-60', 'cursor-not-allowed');
+            measureButton.classList.add('opacity-60', 'cursor-not-allowed');
+            status.textContent = 'Recording calibration sweep (5 seconds)...';
+
+            try {
+                const result = await requestHardwareMeasurement(null);
+                if (result.clipped || result.avgCoherence < 80) {
+                    throw new Error(`Capture rejected: coherence ${result.avgCoherence}%${result.clipped ? ', input clipped' : ''}.`);
+                }
+                if (!isValidComplexSpectrum(result.transferFunctions)) {
+                    throw new Error('Backend did not return valid transfer functions.');
+                }
+
+                if (!calibrationFirstTransfer) {
+                    calibrationFirstTransfer = result.transferFunctions;
+                    status.textContent =
+                        'Step 1 captured. Swap the microphones between ports, keeping channel 1 at the speaker-side port and channel 2 at the sample-side port, then capture step 2.';
+                } else {
+                    const response = await fetch('http://127.0.0.1:5000/calibrate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            firstTransferFunctions: calibrationFirstTransfer,
+                            swappedTransferFunctions: result.transferFunctions
+                        })
+                    });
+                    const calibrationResult = await response.json();
+                    if (!response.ok || calibrationResult.status !== 'ok') {
+                        throw new Error(calibrationResult.message || 'Microphone calibration failed.');
+                    }
+                    if (!isValidComplexSpectrum(calibrationResult.micCalibration)) {
+                        throw new Error('Backend returned invalid microphone calibration data.');
+                    }
+
+                    micCalibration = calibrationResult.micCalibration;
+                    calibrationFirstTransfer = null;
+                    try {
+                        localStorage.setItem('biohush_mic_calibration', JSON.stringify(micCalibration));
+                        status.textContent =
+                            'Calibration saved and applied. Return both microphones to their original positions before measuring the bamboo panel.';
+                    } catch (error) {
+                        status.textContent =
+                            `Calibration is active for this page but could not be saved: ${error.message}. Return the microphones to their original positions.`;
+                    }
+                }
+            } catch (error) {
+                status.textContent = `Calibration capture failed: ${error.message}`;
+            } finally {
+                calibrationButton.disabled = false;
+                measureButton.disabled = false;
+                calibrationButton.classList.remove('opacity-60', 'cursor-not-allowed');
+                measureButton.classList.remove('opacity-60', 'cursor-not-allowed');
+                refreshMicCalibrationControls();
+            }
         }
 
         function updateTestSignalGain() {
@@ -475,28 +645,17 @@
             if (testAudioSource) stopTestSignal();
 
             const btn = document.getElementById('measureBtn');
+            const calibrationButton = document.getElementById('micCalibrationBtn');
             const specimenName = document.getElementById('specimenInput').value || '15mm Bamboo Panel';
-            const temp = parseFloat(document.getElementById('roomTemp').value) || 28;
-            const thickness = parseFloat(document.getElementById('sampleThickness').value) || 15;
 
             btn.disabled = true;
+            calibrationButton.disabled = true;
             btn.classList.add('opacity-60', 'cursor-not-allowed');
             btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Sweeping & Recording (5s)...`;
             if (typeof lucide !== 'undefined') lucide.createIcons();
 
             try {
-                const response = await fetch('http://127.0.0.1:5000/measure', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ temp, thickness })
-                });
-
-                const result = await response.json();
-
-                if (!response.ok || result.status !== 'ok') {
-                    setInvalidState(result.message || 'Hardware measurement failed.');
-                    return;
-                }
+                const result = await requestHardwareMeasurement(micCalibration);
 
                 // Update live telemetry
                 document.getElementById('tof-ms').textContent = `${result.tofMs.toFixed(2)} ms`;
@@ -524,7 +683,8 @@
                     statusText.className = 'text-xs font-bold text-emerald-300';
                     badge.textContent = `${result.avgCoherence}% COHERENCE`;
                     badge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
-                    reasonText.textContent = `Mic RMS: [${result.rms[0]}, ${result.rms[1]}]. Clean signal-to-noise ratio across both channels.`;
+                    const calibrationNote = micCalibration ? ' Microphone calibration applied.' : '';
+                    reasonText.textContent = `Mic RMS: [${result.rms[0]}, ${result.rms[1]}]. Clean signal-to-noise ratio across both channels.${calibrationNote}`;
                     reasonText.className = 'text-[10px] text-emerald-200/80 mt-1.5 leading-relaxed';
 
                     chartPill.classList.remove('hidden');
@@ -550,9 +710,10 @@
                 updateRawDataTable();
 
             } catch (err) {
-                setInvalidState('Cannot connect to Python backend (app.py). Make sure "python app.py" is running in VS Code terminal.');
+                setInvalidState(err.message || 'Cannot connect to Python backend (app.py). Make sure "python app.py" is running in VS Code terminal.');
             } finally {
                 btn.disabled = false;
+                calibrationButton.disabled = false;
                 btn.classList.remove('opacity-60', 'cursor-not-allowed');
                 btn.innerHTML = `<i data-lucide="activity" class="w-4 h-4"></i> Run Live Hardware Measurement (5s)`;
                 if (typeof lucide !== 'undefined') lucide.createIcons();

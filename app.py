@@ -16,13 +16,23 @@ DIST_TO_SAMPLE_L = 0.27     # 270 mm from Mic 2 to sample front face (meters)
 TARGET_FREQS = [250, 500, 750, 1000, 1250, 1500]
 
 def find_bomge_device():
-    """Automatically locates the Bomge USB Audio Interface if connected."""
+    """Find matching BMG input and output devices on the same host API."""
     devices = sd.query_devices()
-    for idx, dev in enumerate(devices):
-        name = dev['name'].lower()
-        if ('bomge' in name or 'usb' in name) and dev['max_input_channels'] >= 2 and dev['max_output_channels'] >= 2:
-            return idx
-    return None  # Falls back to Windows default stereo device
+    inputs = [
+        (idx, dev) for idx, dev in enumerate(devices)
+        if ('bmg-22m' in dev['name'].lower() or 'bomge' in dev['name'].lower())
+        and dev['max_input_channels'] >= 2
+    ]
+    outputs = [
+        (idx, dev) for idx, dev in enumerate(devices)
+        if ('bmg-22m' in dev['name'].lower() or 'bomge' in dev['name'].lower())
+        and dev['max_output_channels'] >= 2
+    ]
+    for input_idx, input_device in inputs:
+        for output_idx, output_device in outputs:
+            if input_device['hostapi'] == output_device['hostapi']:
+                return input_idx, output_idx
+    return None
 
 def generate_log_sweep(fs=48000, duration=5.0, f_start=100, f_end=1500):
     """Generates a phase-continuous logarithmic sine sweep."""
@@ -37,7 +47,31 @@ def generate_log_sweep(fs=48000, duration=5.0, f_start=100, f_end=1500):
     window[-fade_len:] = np.linspace(1, 0, fade_len)
     return (sweep * window * 0.6).astype(np.float32)
 
-def compute_iso10534_2(mic1, mic2, fs, temp_c=28.0):
+def parse_complex_spectrum(values):
+    if not isinstance(values, list) or len(values) != len(TARGET_FREQS):
+        raise ValueError("Calibration data must contain one complex value per target frequency.")
+
+    try:
+        spectrum = np.asarray([complex(float(pair[0]), float(pair[1])) for pair in values])
+    except (TypeError, ValueError, IndexError) as exc:
+        raise ValueError("Each calibration value must be a [real, imaginary] pair.") from exc
+
+    if not np.all(np.isfinite(spectrum.real)) or not np.all(np.isfinite(spectrum.imag)):
+        raise ValueError("Calibration values must be finite.")
+    return spectrum
+
+def compute_mic_calibration(first_transfer, swapped_transfer):
+    """Estimate the correction that cancels mic/channel mismatch after swapping."""
+    if np.any(np.abs(first_transfer) < 1e-12) or np.any(np.abs(swapped_transfer) < 1e-12):
+        raise ValueError("A transfer value is too small to calibrate reliably.")
+
+    # The square-root ratio cancels the reciprocal mic/channel sensitivities.
+    ratio = swapped_transfer / first_transfer
+    correction_phase = np.unwrap(np.angle(ratio)) / 2.0
+    correction_magnitude = np.sqrt(np.abs(ratio))
+    return correction_magnitude * np.exp(1j * correction_phase)
+
+def compute_iso10534_2(mic1, mic2, fs, temp_c=28.0, mic_calibration=None):
     """
     True ISO 10534-2 Two-Microphone Transfer Function Method:
     Computes complex cross-spectral density H12 = S12 / S11 and complex reflection factor R.
@@ -50,14 +84,20 @@ def compute_iso10534_2(mic1, mic2, fs, temp_c=28.0):
     _, S12 = csd(mic1, mic2, fs=fs, nperseg=nperseg)
 
     alphas = []
+    raw_alphas = []
+    reflection_magnitudes = []
     coherences = []
+    transfer_functions = []
 
-    for target_f in TARGET_FREQS:
+    for target_index, target_f in enumerate(TARGET_FREQS):
         idx = np.argmin(np.abs(f - target_f))
         k = (2.0 * np.pi * f[idx]) / c
 
         # Complex Transfer Function H12 = S12 / S11
         H12 = S12[idx] / (S11[idx] + 1e-18)
+        transfer_functions.append(H12)
+        if mic_calibration is not None:
+            H12 *= mic_calibration[target_index]
 
         # Coherence gamma^2 = |S12|^2 / (S11 * S22) (measures signal-to-noise quality)
         gamma_sq = (np.abs(S12[idx]) ** 2) / ((S11[idx] * S22[idx]) + 1e-18)
@@ -72,17 +112,56 @@ def compute_iso10534_2(mic1, mic2, fs, temp_c=28.0):
 
         # Normal-Incidence Sound Absorption Coefficient alpha = 1 - |R|^2
         alpha = 1.0 - (np.abs(R) ** 2)
+        raw_alphas.append(float(alpha))
+        reflection_magnitudes.append(float(np.abs(R)))
         alphas.append(round(float(np.clip(alpha, 0.0, 1.0)), 2))
 
-    return alphas, coherences, round(float(c), 1)
+    return (
+        alphas,
+        coherences,
+        round(float(c), 1),
+        raw_alphas,
+        reflection_magnitudes,
+        transfer_functions
+    )
+
+@app.route('/calibrate', methods=['POST'])
+def calibrate_microphones():
+    data = request.json or {}
+    try:
+        first_transfer = parse_complex_spectrum(data.get('firstTransferFunctions'))
+        swapped_transfer = parse_complex_spectrum(data.get('swappedTransferFunctions'))
+        correction = compute_mic_calibration(first_transfer, swapped_transfer)
+    except ValueError as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 400
+
+    return jsonify({
+        "status": "ok",
+        "micCalibration": [[float(value.real), float(value.imag)] for value in correction]
+    })
 
 @app.route('/measure', methods=['POST'])
 def run_measurement():
     data = request.json or {}
     temp_c = float(data.get('temp', 28.0))
     thickness_mm = float(data.get('thickness', 15.0))
+    try:
+        mic_calibration = (
+            parse_complex_spectrum(data['micCalibration'])
+            if data.get('micCalibration') is not None else None
+        )
+    except ValueError as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 400
 
-    device_idx = find_bomge_device()
+    device_pair = find_bomge_device()
+    if device_pair is None:
+        return jsonify({
+            "status": "error",
+            "message": "Could not find matching two-channel BMG-22M input and output devices. Check the audio interface connection."
+        }), 500
+
+    input_idx, output_idx = device_pair
+    print(f"Using BMG audio devices: input={input_idx}, output={output_idx}", flush=True)
     sweep = generate_log_sweep(FS, DURATION)
     stereo_out = np.column_stack((sweep, sweep))
 
@@ -92,7 +171,7 @@ def run_measurement():
             stereo_out,
             samplerate=FS,
             channels=2,
-            device=device_idx,
+            device=device_pair,
             blocking=True
         )
     except Exception as e:
@@ -114,7 +193,19 @@ def run_measurement():
     # Check for digital clipping
     clipped = bool(np.max(np.abs(mic1)) >= 0.99 or np.max(np.abs(mic2)) >= 0.99)
 
-    alphas, coherences, speed_of_sound = compute_iso10534_2(mic1, mic2, FS, temp_c)
+    (
+        alphas,
+        coherences,
+        speed_of_sound,
+        raw_alphas,
+        reflection_magnitudes,
+        transfer_functions
+    ) = compute_iso10534_2(mic1, mic2, FS, temp_c, mic_calibration)
+    diagnostics = ", ".join(
+        f"{freq} Hz: raw alpha={alpha:.4f}, |R|={magnitude:.4f}"
+        for freq, alpha, magnitude in zip(TARGET_FREQS, raw_alphas, reflection_magnitudes)
+    )
+    print(f"Absorption diagnostics: {diagnostics}", flush=True)
     avg_coherence = float(np.mean(coherences))
 
     # Calculate propagation time to sample face
@@ -124,6 +215,7 @@ def run_measurement():
     return jsonify({
         "status": "ok",
         "alphas": alphas,
+        "transferFunctions": [[float(value.real), float(value.imag)] for value in transfer_functions],
         "coherences": [round(c, 3) for c in coherences],
         "avgCoherence": round(avg_coherence * 100, 1),
         "clipped": clipped,
