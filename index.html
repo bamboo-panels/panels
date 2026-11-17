@@ -4,28 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BioHUSH | DIY Impedance Tube</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
-                    colors: {
-                        dark: { 900: '#0b0f19', 950: '#030712' }
-                    }
+                    colors: { dark: { 900: '#0b0f19', 950: '#030712' } }
                 }
             }
         }
     </script>
-    <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body class="bg-dark-950 text-slate-100 min-h-screen font-sans antialiased flex flex-col">
 
-    <!-- Top Navigation Header -->
+    <!-- Header -->
     <header class="border-b border-slate-800 bg-dark-900/80 backdrop-blur sticky top-0 z-50 px-6 py-3 flex items-center justify-between">
         <div class="flex items-center gap-3">
             <div class="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></div>
@@ -41,13 +36,11 @@
         </div>
     </header>
 
-    <!-- Main Dashboard Layout -->
+    <!-- Main Dashboard -->
     <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-[1600px] w-full mx-auto">
 
-        <!-- Left Column: Controls & Parameters (4 Cols) -->
+        <!-- Left Column: Controls (4 Cols) -->
         <section class="lg:col-span-4 space-y-4">
-            
-            <!-- Tube Parameters Card -->
             <div class="bg-dark-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-3">
                 <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                     <i data-lucide="sliders" class="w-3.5 h-3.5 text-indigo-400"></i> Tube Parameters
@@ -55,14 +48,20 @@
 
                 <div>
                     <label class="block text-[11px] text-slate-400 mb-1">Specimen Name</label>
-                    <input type="text" id="specimenInput" value="Bamboo Panel" oninput="updateSpecimenNameLabel()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                    <input type="text" id="specimenInput" value="15mm Bamboo Panel" oninput="updateSpecimenNameLabel()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
                 </div>
 
-                <div>
-                    <label class="block text-[11px] text-slate-400 mb-1">Tube Diameter (d)</label>
-                    <select id="tubeDiameter" onchange="calculateDensity()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
-                        <option value="100">100 mm (Low Frequency - 4 inch)</option>
-                    </select>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">Tube Diameter (d)</label>
+                        <select id="tubeDiameter" onchange="calculateDensity()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <option value="100">100 mm (4 inch)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-400 mb-1">Room Temp (&deg;C)</label>
+                        <input type="number" id="roomTemp" value="28" oninput="calculateTimeOfFlight()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                    </div>
                 </div>
 
                 <!-- Density Converter -->
@@ -76,11 +75,11 @@
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-[10px] text-slate-500 mb-0.5">Mass (g)</label>
-                            <input type="number" id="sampleMass" value="1.7" oninput="calculateDensity()" class="w-full bg-dark-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <input type="number" id="sampleMass" value="35.0" oninput="calculateDensity()" class="w-full bg-dark-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
                         </div>
                         <div>
                             <label class="block text-[10px] text-slate-500 mb-0.5">Thickness (mm)</label>
-                            <input type="number" id="sampleThickness" value="15" oninput="calculateDensity(); calculateTimeOfFlight(20);" class="w-full bg-dark-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <input type="number" id="sampleThickness" value="15" oninput="calculateDensity(); calculateTimeOfFlight();" class="w-full bg-dark-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
                         </div>
                     </div>
                     <div>
@@ -89,37 +88,7 @@
                     </div>
                 </div>
 
-                <!-- Test Audio Generator -->
-                <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 space-y-2">
-                    <span class="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
-                        <i data-lucide="volume-2" class="w-3 h-3 text-indigo-400"></i> Test Audio Generator
-                    </span>
-                    <div>
-                        <label class="block text-[10px] text-slate-500 mb-0.5">Signal Type / Audio File</label>
-                        <select id="audioSignalType" class="w-full bg-dark-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
-                            <option value="sweep">Sine Sweep (20Hz - 2000Hz)</option>
-                            <option value="whitenoise">White Noise</option>
-                            <option value="pinknoise">Pink Noise</option>
-                        </select>
-                    </div>
-                    <div>
-                        <input type="file" id="audioFile" accept="audio/*" onchange="loadCustomAudio(event)" class="hidden">
-                        <button onclick="document.getElementById('audioFile').click()" class="w-full border border-dashed border-slate-700 hover:border-indigo-500 text-slate-400 hover:text-slate-200 text-[11px] py-1 px-2 rounded transition flex items-center justify-center gap-1">
-                            <i data-lucide="upload" class="w-3 h-3"></i> Choose Audio File (.wav)
-                        </button>
-                    </div>
-                    <div class="flex items-center gap-2 pt-1">
-                        <button id="audioPlayBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold py-1.5 px-3 rounded transition flex items-center justify-center gap-1 shadow-sm">
-                            <i data-lucide="play" class="w-3 h-3"></i> Play Signal
-                        </button>
-                        <button onclick="stopAudioPlayback()" class="bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-semibold py-1.5 px-3 rounded transition">
-                            Stop
-                        </button>
-                    </div>
-                    <audio id="audioElement" preload="auto" loop></audio>
-                </div>
-
-                <!-- Propagation Time Info -->
+                <!-- Propagation Time & Speed of Sound -->
                 <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 flex items-center justify-between">
                     <div>
                         <span class="text-[10px] text-slate-500 uppercase font-mono block">Propagation Time</span>
@@ -131,57 +100,56 @@
                     </div>
                 </div>
 
-                <!-- Seal Integrity Indicator Card -->
+                <!-- Signal Coherence Indicator -->
                 <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex items-center justify-between">
                     <div>
-                        <span class="text-[10px] text-slate-400 uppercase font-mono block">Sample Seal Integrity</span>
+                        <span class="text-[10px] text-slate-400 uppercase font-mono block">Transfer Coherence (&gamma;&sup2;)</span>
                         <span id="sealScoreDisplay" class="text-base font-bold text-slate-100 font-mono">--%</span>
                     </div>
                     <span id="sealStatusBadge" class="text-[10px] font-bold px-2.5 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                        UNCHECKED
+                        STANDBY
                     </span>
                 </div>
 
-                <!-- Observation Sheet Data Readiness Card -->
+                <!-- Observation Sheet Status -->
                 <div id="observationReadinessCard" class="bg-slate-950/80 border border-slate-800 rounded-lg p-3 transition-all duration-300">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span id="obsDotIndicator" class="w-2.5 h-2.5 rounded-full bg-slate-600"></span>
                             <div>
                                 <span class="text-[10px] text-slate-400 uppercase font-mono block">Observation Sheet Status</span>
-                                <span id="obsStatusText" class="text-xs font-bold text-slate-300">Awaiting Measurement</span>
+                                <span id="obsStatusText" class="text-xs font-bold text-slate-300">Awaiting Hardware Test</span>
                             </div>
                         </div>
                         <span id="obsConfidenceBadge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                            --% ACCURACY
+                            --% COHERENCE
                         </span>
                     </div>
                     <p id="obsReasonText" class="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
-                        Click "Run Measurement" to validate ISO 10534-2 stability and coherence before recording.
+                        Ensure app.py is running, Bomge BMG-22M is powered on, and click Run Measurement.
                     </p>
                 </div>
 
-                <!-- Run Measurement Trigger -->
-                <button onclick="runTestSimulation()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs py-2.5 rounded-lg transition shadow-md flex items-center justify-center gap-2">
-                    <i data-lucide="activity" class="w-4 h-4"></i> Run Measurement
+                <!-- Run Measurement Button -->
+                <button id="measureBtn" onclick="runHardwareMeasurement()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs py-2.5 rounded-lg transition shadow-md flex items-center justify-center gap-2">
+                    <i data-lucide="activity" class="w-4 h-4"></i> Run Live Hardware Measurement (5s)
                 </button>
             </div>
-
         </section>
 
-        <!-- Center Column: Sound Absorption Spectrum Chart (5 Cols) -->
+        <!-- Center Column: Chart (5 Cols) -->
         <section class="lg:col-span-5 bg-dark-900 border border-slate-800 rounded-xl p-4 shadow-md flex flex-col">
             <div class="flex items-center justify-between mb-3">
                 <div>
                     <h2 class="text-sm font-bold text-slate-100">Sound Absorption Spectrum</h2>
-                    <p id="currentActiveLabel" class="text-xs text-indigo-400 font-medium">Viewing: Bamboo Panel</p>
+                    <p id="currentActiveLabel" class="text-xs text-indigo-400 font-medium">Viewing: 15mm Bamboo Panel</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <span id="chartValidPill" class="hidden text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                        READY FOR OBSERVATION SHEET
+                        VALIDATED HARDWARE DATA
                     </span>
-                    <span class="text-[11px] font-semibold px-2.5 py-1 rounded bg-slate-800/80 text-slate-300 border border-slate-700">ISO 10534-2 Method</span>
+                    <span class="text-[11px] font-semibold px-2.5 py-1 rounded bg-slate-800/80 text-slate-300 border border-slate-700">ISO 10534-2</span>
                 </div>
             </div>
             <div class="flex-1 relative min-h-[350px]">
@@ -189,10 +157,8 @@
             </div>
         </section>
 
-        <!-- Right Column: Specimen History & Raw Data Table (3 Cols) -->
+        <!-- Right Column: History & Raw Data (3 Cols) -->
         <section class="lg:col-span-3 space-y-4">
-            
-            <!-- Specimen History Card -->
             <div class="bg-dark-900 border border-slate-800 rounded-xl p-4 shadow-md flex flex-col max-h-[320px]">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
@@ -201,11 +167,10 @@
                     <span id="historyCount" class="text-[10px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded">0 saved</span>
                 </div>
                 <div id="historyList" class="flex-1 overflow-y-auto space-y-2 pr-1">
-                    <p class="text-xs text-slate-500 text-center py-8">No saved specimens yet. Run a test and click "Save to History".</p>
+                    <p class="text-xs text-slate-500 text-center py-8">No saved specimens yet.</p>
                 </div>
             </div>
 
-            <!-- Raw Data Table Card -->
             <div class="bg-dark-900 border border-slate-800 rounded-xl p-4 shadow-md flex flex-col max-h-[300px]">
                 <div class="flex items-center justify-between mb-2">
                     <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
@@ -224,61 +189,45 @@
                                 <th class="p-2 text-right">Status</th>
                             </tr>
                         </thead>
-                        <tbody id="rawDataTable" class="divide-y divide-slate-900 text-slate-300">
-                            <!-- Populated dynamically -->
-                        </tbody>
+                        <tbody id="rawDataTable" class="divide-y divide-slate-900 text-slate-300"></tbody>
                     </table>
                 </div>
             </div>
-
         </section>
-
     </main>
 
-    <!-- Formal White-Background Manuscript Modal Popup -->
+    <!-- White-Background Manuscript Modal -->
     <div id="manuscriptModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white text-slate-900 rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-4 border border-slate-300 relative">
-            <!-- Modal Header -->
             <div class="flex items-center justify-between border-b border-slate-200 pb-3">
                 <div>
                     <h3 id="modalSpecimenTitle" class="text-base font-bold text-slate-900 font-serif">Figure: Normal-Incidence Sound Absorption Spectrum</h3>
-                    <p id="modalTimestamp" class="text-xs text-slate-500 font-mono">ISO 10534-2 Two-Microphone Transfer Method | Tested at 20°C</p>
+                    <p id="modalTimestamp" class="text-xs text-slate-500 font-mono">ISO 10534-2 Two-Microphone Transfer Method</p>
                 </div>
                 <button onclick="closeManuscriptModal()" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition font-bold text-lg leading-none">&times;</button>
             </div>
-
-            <!-- Clean White Chart Container for Manuscript Screenshot -->
             <div class="relative w-full h-[280px] bg-white border border-slate-200 rounded-xl p-2">
                 <canvas id="manuscriptChart"></canvas>
             </div>
-
-            <!-- Compact Data Table for Manuscript Observation Sheet -->
             <div class="border border-slate-200 rounded-xl overflow-hidden max-h-[160px] overflow-y-auto">
                 <table class="w-full text-left text-xs">
                     <thead class="bg-slate-100 text-slate-700 font-semibold sticky top-0 border-b border-slate-200">
                         <tr>
-                            <th class="p-2.5">Frequency ($f$ in Hz)</th>
-                            <th class="p-2.5">Absorption Coefficient ($\alpha$)</th>
-                            <th class="p-2.5 text-right">Observation Status</th>
+                            <th class="p-2.5">Frequency (Hz)</th>
+                            <th class="p-2.5">Absorption Coefficient (&alpha;)</th>
+                            <th class="p-2.5 text-right">Status</th>
                         </tr>
                     </thead>
                     <tbody id="modalDataTable" class="divide-y divide-slate-100 text-slate-800 font-mono text-[11px]"></tbody>
                 </table>
             </div>
-
-            <!-- Modal Footer Actions -->
             <div class="flex items-center justify-between pt-2">
-                <span id="modalValidityBadge" class="text-[11px] font-bold px-3 py-1 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
-                    ✓ Validated for Thesis Observation Sheet
-                </span>
-                <button onclick="closeManuscriptModal()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-xl transition shadow">
-                    Close Preview
-                </button>
+                <span id="modalValidityBadge" class="text-[11px] font-bold px-3 py-1 rounded bg-emerald-100 text-emerald-800 border border-emerald-300"></span>
+                <button onclick="closeManuscriptModal()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-xl transition shadow">Close Preview</button>
             </div>
         </div>
     </div>
 
-    <!-- App Logic Script -->
     <script>
         let absorptionChart;
         let manuscriptChart = null;
@@ -286,41 +235,20 @@
         let savedHistory = [];
         let lastValidationResult = { isValid: false, accuracyScore: 0 };
 
-        // Unified Audio Context (Shared between speaker output and mic analyzer)
-        let sharedAudioCtx = null;
-        let micStream = null;
-        let analyserNode = null;
-        let dataArray = null;
-        let activeNode = null;
-        let activeGainNode = null;
-
-        // Tube Geometry Constants (ISO 10534-2 Setup)
-        const TUBE_DIAMETER_M = 0.1016; 
-        const MIC_SPACING_S = 0.05;   
-        const DIST_TO_SAMPLE_L = 0.40; 
-
-        // Observation Sheet Target Frequencies (250 Hz to 2000 Hz)
-        const TARGET_FREQUENCIES = [250, 500, 750, 1000, 1250, 1500, 1750, 2000];
+        const DIST_TO_SAMPLE_L = 0.40;
         const TARGET_FREQ_LABELS = ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '1750 Hz', '2000 Hz'];
 
         document.addEventListener('DOMContentLoaded', () => {
-            if (typeof lucide !== 'undefined') {
-                lucide.createIcons();
-            }
+            if (typeof lucide !== 'undefined') lucide.createIcons();
             initChart();
             calculateDensity();
-            calculateTimeOfFlight(20);
+            calculateTimeOfFlight();
 
-            const storedHistory = localStorage.getItem('acoustic_test_history');
+            const storedHistory = localStorage.getItem('biohush_hardware_history');
             if (storedHistory) {
                 try { savedHistory = JSON.parse(storedHistory); } catch (e) { savedHistory = []; }
             }
             renderHistoryList();
-
-            const playBtn = document.getElementById('audioPlayBtn');
-            if (playBtn) {
-                playBtn.addEventListener('click', toggleAudioPlayback);
-            }
         });
 
         function calculateDensity() {
@@ -329,40 +257,35 @@
             const radiusMeters = (parseInt(document.getElementById('tubeDiameter').value) / 1000) / 2;
             const volumeMeters3 = Math.PI * Math.pow(radiusMeters, 2) * (thickness / 1000);
             let densityKgM3 = volumeMeters3 > 0 ? (mass / 1000) / volumeMeters3 : 0;
-            const densityField = document.getElementById('materialDensity');
-            if (densityField) densityField.value = Math.round(densityKgM3);
+            document.getElementById('materialDensity').value = Math.round(densityKgM3);
         }
 
-        function calculateTimeOfFlight(tempCelsius = 20) {
+        function calculateTimeOfFlight() {
+            const tempCelsius = parseFloat(document.getElementById('roomTemp').value) || 28;
             const speedOfSound = 331.3 * Math.sqrt(1 + (tempCelsius / 273.15));
             const sampleThicknessMm = parseFloat(document.getElementById('sampleThickness').value) || 15;
-            const totalDistanceMeters = DIST_TO_SAMPLE_L + (sampleThicknessMm / 1000); 
+            const totalDistanceMeters = DIST_TO_SAMPLE_L + (sampleThicknessMm / 1000);
             const timeInMilliseconds = (totalDistanceMeters / speedOfSound) * 1000;
 
-            const tofEl = document.getElementById('tof-ms');
-            const speedEl = document.getElementById('speed-sound');
-            
-            if (tofEl) tofEl.textContent = `${timeInMilliseconds.toFixed(2)} ms`;
-            if (speedEl) speedEl.textContent = `${Math.round(speedOfSound)} m/s`;
+            document.getElementById('tof-ms').textContent = `${timeInMilliseconds.toFixed(2)} ms`;
+            document.getElementById('speed-sound').textContent = `${speedOfSound.toFixed(1)} m/s`;
         }
 
         function initChart() {
             const canvasEl = document.getElementById('absorptionChart');
-            if (!canvasEl) return;
-            
             absorptionChart = new Chart(canvasEl.getContext('2d'), {
                 type: 'line',
                 data: {
                     labels: TARGET_FREQ_LABELS,
                     datasets: [{
-                        label: 'Bamboo Panel (\u03b1)',
-                        data: [0.15, 0.32, 0.50, 0.72, 0.85, 0.78, 0.62, 0.45],
+                        label: 'Awaiting Measurement (\u03b1)',
+                        data: [0, 0, 0, 0, 0, 0, 0, 0],
                         borderColor: '#6366f1',
                         backgroundColor: 'rgba(99, 102, 241, 0.1)',
                         borderWidth: 2,
                         fill: true,
-                        tension: 0.3,
-                        pointRadius: 3,
+                        tension: 0.25,
+                        pointRadius: 4,
                         pointBackgroundColor: '#6366f1'
                     }]
                 },
@@ -376,56 +299,104 @@
                     }
                 }
             });
-
-            currentTestData = TARGET_FREQ_LABELS.map((label, idx) => ({
-                freq: label,
-                alpha: absorptionChart.data.datasets[0].data[idx],
-                valid: false
-            }));
+            currentTestData = TARGET_FREQ_LABELS.map(label => ({ freq: label, alpha: 0, valid: false }));
             updateRawDataTable();
         }
 
         function updateSpecimenNameLabel() {
             const specimenInput = document.getElementById('specimenInput');
-            const labelEl = document.getElementById('currentActiveLabel');
-            if (specimenInput && labelEl) {
-                labelEl.textContent = `Viewing: ${specimenInput.value || 'Unnamed Specimen'}`;
+            document.getElementById('currentActiveLabel').textContent = `Viewing: ${specimenInput.value || 'Unnamed Specimen'}`;
+        }
+
+        async function runHardwareMeasurement() {
+            const btn = document.getElementById('measureBtn');
+            const specimenName = document.getElementById('specimenInput').value || '15mm Bamboo Panel';
+            const temp = parseFloat(document.getElementById('roomTemp').value) || 28;
+            const thickness = parseFloat(document.getElementById('sampleThickness').value) || 15;
+
+            btn.disabled = true;
+            btn.classList.add('opacity-60', 'cursor-not-allowed');
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Sweeping & Recording (5s)...`;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            try {
+                const response = await fetch('http://127.0.0.1:5000/measure', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ temp, thickness })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok || result.status !== 'ok') {
+                    setInvalidState(result.message || 'Hardware measurement failed.');
+                    return;
+                }
+
+                // Update live telemetry
+                document.getElementById('tof-ms').textContent = `${result.tofMs.toFixed(2)} ms`;
+                document.getElementById('speed-sound').textContent = `${result.speedOfSound} m/s`;
+                document.getElementById('sealScoreDisplay').textContent = `${result.avgCoherence}%`;
+
+                const isValid = !result.clipped && result.avgCoherence >= 80;
+                lastValidationResult = { isValid, accuracyScore: result.avgCoherence };
+
+                const sealBadge = document.getElementById('sealStatusBadge');
+                const card = document.getElementById('observationReadinessCard');
+                const dot = document.getElementById('obsDotIndicator');
+                const statusText = document.getElementById('obsStatusText');
+                const badge = document.getElementById('obsConfidenceBadge');
+                const reasonText = document.getElementById('obsReasonText');
+                const chartPill = document.getElementById('chartValidPill');
+
+                if (isValid) {
+                    sealBadge.textContent = 'HIGH COHERENCE';
+                    sealBadge.className = 'text-[10px] font-bold px-2.5 py-1 rounded border bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+
+                    card.className = 'bg-emerald-950/40 border border-emerald-500/50 rounded-lg p-3 transition-all duration-300';
+                    dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]';
+                    statusText.textContent = 'VALID HARDWARE DATA';
+                    statusText.className = 'text-xs font-bold text-emerald-300';
+                    badge.textContent = `${result.avgCoherence}% COHERENCE`;
+                    badge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+                    reasonText.textContent = `Mic RMS: [${result.rms[0]}, ${result.rms[1]}]. Clean signal-to-noise ratio across both channels.`;
+                    reasonText.className = 'text-[10px] text-emerald-200/80 mt-1.5 leading-relaxed';
+
+                    chartPill.classList.remove('hidden');
+                    absorptionChart.data.datasets[0].borderColor = '#10b981';
+                    absorptionChart.data.datasets[0].backgroundColor = 'rgba(16, 185, 129, 0.12)';
+                    absorptionChart.data.datasets[0].pointBackgroundColor = '#10b981';
+                } else {
+                    const reason = result.clipped
+                        ? 'Input clipped! Turn down gain knobs on the Bomge interface.'
+                        : `Low transfer coherence (${result.avgCoherence}%). Check sample seal or increase speaker volume.`;
+                    setInvalidState(reason, result.avgCoherence);
+                }
+
+                absorptionChart.data.datasets[0].data = result.alphas;
+                absorptionChart.data.datasets[0].label = `${specimenName} (\u03b1)`;
+                absorptionChart.update();
+
+                currentTestData = TARGET_FREQ_LABELS.map((label, idx) => ({
+                    freq: label,
+                    alpha: result.alphas[idx],
+                    valid: isValid
+                }));
+                updateRawDataTable();
+
+            } catch (err) {
+                setInvalidState('Cannot connect to Python backend (app.py). Make sure "python app.py" is running in VS Code terminal.');
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-60', 'cursor-not-allowed');
+                btn.innerHTML = `<i data-lucide="activity" class="w-4 h-4"></i> Run Live Hardware Measurement (5s)`;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
             }
         }
 
-        function evaluateSampleSeal(mags) {
-            let sealScore = mags.slice(0, 2).reduce((a, b) => a + b, 0) / 2 < 0.3 ? Math.floor(50 + Math.random() * 18) : Math.floor(90 + Math.random() * 9);
-            let isLeaking = sealScore < 75;
-            if (document.getElementById('sealScoreDisplay')) document.getElementById('sealScoreDisplay').textContent = `${sealScore}%`;
-            const badge = document.getElementById('sealStatusBadge');
-            if (badge) {
-                badge.textContent = isLeaking ? 'AIR LEAK DETECTED' : 'HERMETIC SEAL OK';
-                badge.className = `text-[10px] font-bold px-2.5 py-1 rounded border ${isLeaking ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'}`;
-            }
-            return { sealScore, isLeaking };
-        }
-
-        function evaluateObservationSheetReadiness(alphas, sealResult, isLiveMic) {
-            const sealPass = !sealResult.isLeaking && sealResult.sealScore >= 85;
-            const clippedPoints = alphas.filter(a => a <= 0.02 || a >= 0.98).length;
-            const boundsPass = clippedPoints === 0;
-
-            let maxJump = 0;
-            for (let i = 1; i < alphas.length; i++) {
-                const jump = Math.abs(alphas[i] - alphas[i - 1]);
-                if (jump > maxJump) maxJump = jump;
-            }
-            const coherencePass = maxJump <= 0.45;
-
-            let accuracyScore = sealResult.sealScore;
-            if (!boundsPass) accuracyScore -= clippedPoints * 6;
-            if (!coherencePass) accuracyScore -= 15;
-            if (!isLiveMic) accuracyScore = Math.min(accuracyScore, 94);
-            accuracyScore = Math.max(0, Math.min(99, Math.round(accuracyScore)));
-
-            const isValid = sealPass && boundsPass && coherencePass && accuracyScore >= 85;
-            lastValidationResult = { isValid, accuracyScore };
-
+        function setInvalidState(message, coherence = 0) {
+            lastValidationResult = { isValid: false, accuracyScore: coherence };
+            const sealBadge = document.getElementById('sealStatusBadge');
             const card = document.getElementById('observationReadinessCard');
             const dot = document.getElementById('obsDotIndicator');
             const statusText = document.getElementById('obsStatusText');
@@ -433,105 +404,27 @@
             const reasonText = document.getElementById('obsReasonText');
             const chartPill = document.getElementById('chartValidPill');
 
-            if (isValid) {
-                card.className = 'bg-emerald-950/40 border border-emerald-500/50 rounded-lg p-3 transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.12)]';
-                dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]';
-                statusText.textContent = 'VALID FOR OBSERVATION SHEET';
-                statusText.className = 'text-xs font-bold text-emerald-300';
-                badge.textContent = `${accuracyScore}% ACCURACY`;
-                badge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
-                reasonText.textContent = 'Hermetic seal verified, zero clipping, and smooth ISO 10534-2 transfer curve. Safe to record.';
-                reasonText.className = 'text-[10px] text-emerald-200/80 mt-1.5 leading-relaxed';
+            sealBadge.textContent = 'SIGNAL ERROR';
+            sealBadge.className = 'text-[10px] font-bold px-2.5 py-1 rounded border bg-rose-500/20 text-rose-400 border-rose-500/30';
 
-                if (chartPill) chartPill.classList.remove('hidden');
-                absorptionChart.data.datasets[0].borderColor = '#10b981';
-                absorptionChart.data.datasets[0].backgroundColor = 'rgba(16, 185, 129, 0.12)';
-                absorptionChart.data.datasets[0].pointBackgroundColor = '#10b981';
-            } else {
-                card.className = 'bg-amber-950/30 border border-amber-500/40 rounded-lg p-3 transition-all duration-300';
-                dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
-                statusText.textContent = 'DO NOT RECORD — RE-TEST';
-                statusText.className = 'text-xs font-bold text-amber-300';
-                badge.textContent = `${accuracyScore}% ACCURACY`;
-                badge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40';
+            card.className = 'bg-rose-950/30 border border-rose-500/40 rounded-lg p-3 transition-all duration-300';
+            dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-400';
+            statusText.textContent = 'DO NOT RECORD — CHECK HARDWARE';
+            statusText.className = 'text-xs font-bold text-rose-300';
+            badge.textContent = `${coherence}% COHERENCE`;
+            badge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40';
+            reasonText.textContent = message;
+            reasonText.className = 'text-[10px] text-rose-200/80 mt-1.5 leading-relaxed';
 
-                let issue = 'Unstable reading detected.';
-                if (!sealPass) issue = 'Air leak around specimen edge. Reseat sample.';
-                else if (!boundsPass) issue = 'Signal clipped at sensor limits. Adjust volume and re-run.';
-                else if (!coherencePass) issue = 'Sudden frequency spike detected. Re-run test.';
-                reasonText.textContent = issue;
-                reasonText.className = 'text-[10px] text-amber-200/80 mt-1.5 leading-relaxed';
-
-                if (chartPill) chartPill.classList.add('hidden');
-                absorptionChart.data.datasets[0].borderColor = '#6366f1';
-                absorptionChart.data.datasets[0].backgroundColor = 'rgba(99, 102, 241, 0.1)';
-                absorptionChart.data.datasets[0].pointBackgroundColor = '#6366f1';
-            }
-
-            return lastValidationResult;
-        }
-
-        async function runTestSimulation() {
-            const specimenName = document.getElementById('specimenInput').value || 'Bamboo Panel';
-            let liveEnergyFactor = 0.5;
-            let isLiveMic = false;
-            let micBuffer = [];
-
-            try {
-                if (!sharedAudioCtx) {
-                    sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                }
-                if (sharedAudioCtx.state === 'suspended') {
-                    await sharedAudioCtx.resume();
-                }
-                if (!micStream) {
-                    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                    const source = sharedAudioCtx.createMediaStreamSource(micStream);
-                    analyserNode = sharedAudioCtx.createAnalyser();
-                    analyserNode.fftSize = 256;
-                    source.connect(analyserNode);
-                    dataArray = new Uint8Array(analyserNode.frequencyBinCount);
-                }
-                if (analyserNode && dataArray) {
-                    analyserNode.getByteFrequencyData(dataArray);
-                    let sum = 0;
-                    for (let i = 0; i < dataArray.length; i++) {
-                        sum += dataArray[i];
-                        micBuffer.push(dataArray[i]);
-                    }
-                    liveEnergyFactor = (sum / dataArray.length) / 255;
-                    isLiveMic = true;
-                }
-            } catch (error) {
-                console.warn("Live mic stream unavailable or restricted (using simulation fallback):", error);
-                micBuffer = [120, 135, 140, 155, 130, 110, 95, 80];
-            }
-
-            const newData = TARGET_FREQUENCIES.map((_, idx) => {
-                let baseVal = 0.3 + (liveEnergyFactor * 0.4) - (idx * 0.02);
-                const randomVariation = (Math.random() * 0.10) - 0.05;
-                return parseFloat(Math.min(Math.max(baseVal + randomVariation, 0.02), 0.98).toFixed(2));
-            });
-
-            const transferMags = newData.map(a => 0.85 + (a * 0.1));
-            const sealResult = evaluateSampleSeal(transferMags);
-            evaluateObservationSheetReadiness(newData, sealResult, isLiveMic);
-
-            absorptionChart.data.datasets[0].data = newData;
-            absorptionChart.data.datasets[0].label = `${specimenName} (\u03b1)`;
+            chartPill.classList.add('hidden');
+            absorptionChart.data.datasets[0].borderColor = '#f43f5e';
+            absorptionChart.data.datasets[0].backgroundColor = 'rgba(244, 63, 94, 0.1)';
+            absorptionChart.data.datasets[0].pointBackgroundColor = '#f43f5e';
             absorptionChart.update();
-
-            currentTestData = TARGET_FREQ_LABELS.map((label, idx) => ({
-                freq: label,
-                alpha: newData[idx],
-                valid: lastValidationResult.isValid
-            }));
-            updateRawDataTable();
         }
 
         function updateRawDataTable() {
             const tbody = document.getElementById('rawDataTable');
-            if (!tbody) return;
             tbody.innerHTML = '';
             currentTestData.forEach(row => {
                 const tr = document.createElement('tr');
@@ -545,23 +438,23 @@
         }
 
         function exportCSV() {
-            let csvContent = "data:text/csv;charset=utf-8,Frequency (Hz),Absorption Coefficient (Alpha),Observation Sheet Valid,Accuracy (%)\n";
+            let csvContent = "data:text/csv;charset=utf-8,Frequency (Hz),Absorption Coefficient (Alpha),Valid Hardware Signal,Coherence (%)\n";
             currentTestData.forEach(row => {
                 csvContent += `${row.freq},${row.alpha},${row.valid ? 'YES' : 'NO'},${lastValidationResult.accuracyScore}\n`;
             });
             const link = document.createElement("a");
             link.setAttribute("href", encodeURI(csvContent));
-            link.setAttribute("download", "iso10534_observation_sheet_data.csv");
+            link.setAttribute("download", "iso10534_hardware_results.csv");
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         }
 
         function saveCurrentTest() {
-            const specimenName = document.getElementById('specimenInput').value || 'Bamboo Panel';
+            const specimenName = document.getElementById('specimenInput').value || '15mm Bamboo Panel';
             const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const speedSoundVal = document.getElementById('speed-sound').textContent || '343 m/s';
-            
+            const speedSoundVal = document.getElementById('speed-sound').textContent || '-- m/s';
+
             savedHistory.push({
                 name: specimenName,
                 time: timestamp,
@@ -570,7 +463,7 @@
                 valid: lastValidationResult.isValid,
                 accuracy: lastValidationResult.accuracyScore
             });
-            localStorage.setItem('acoustic_test_history', JSON.stringify(savedHistory));
+            localStorage.setItem('biohush_hardware_history', JSON.stringify(savedHistory));
             renderHistoryList();
         }
 
@@ -578,7 +471,7 @@
             event.stopPropagation();
             if (confirm("Delete this test record?")) {
                 savedHistory.splice(index, 1);
-                localStorage.setItem('acoustic_test_history', JSON.stringify(savedHistory));
+                localStorage.setItem('biohush_hardware_history', JSON.stringify(savedHistory));
                 renderHistoryList();
             }
         }
@@ -586,23 +479,20 @@
         function renderHistoryList() {
             const listContainer = document.getElementById('historyList');
             const countBadge = document.getElementById('historyCount');
-            if (!listContainer || !countBadge) return;
             countBadge.textContent = `${savedHistory.length} saved`;
 
             if (savedHistory.length === 0) {
-                listContainer.innerHTML = `<p class="text-xs text-slate-500 text-center py-8">No saved specimens yet. Run a test and click "Save to History".</p>`;
+                listContainer.innerHTML = `<p class="text-xs text-slate-500 text-center py-8">No saved specimens yet.</p>`;
                 return;
             }
 
             listContainer.innerHTML = '';
             savedHistory.forEach((item, index) => {
                 const div = document.createElement('div');
-                div.className = 'bg-slate-950 border border-slate-800 rounded-lg p-3 flex items-center justify-between hover:border-indigo-500/50 transition group';
-                
+                div.className = 'bg-slate-950 border border-slate-800 rounded-lg p-3 flex items-center justify-between hover:border-indigo-500/50 transition';
                 const validTag = item.valid
-                    ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 ml-1.5">VALID (${item.accuracy || 94}%)</span>`
+                    ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 ml-1.5">VALID (${item.accuracy}%)</span>`
                     : '';
-                
                 const speedTag = item.speedSound ? `<span class="text-[10px] text-indigo-400 font-mono ml-2">${item.speedSound}</span>` : '';
 
                 div.innerHTML = `
@@ -611,11 +501,11 @@
                         <span class="text-[10px] text-slate-500">Saved at ${item.time}</span> ${speedTag}
                     </div>
                     <div class="flex items-center gap-1.5">
-                        <button onclick="openManuscriptModal(${index})" class="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-[10px] font-semibold px-2 py-1 rounded transition flex items-center gap-1" title="View Manuscript Graph">
+                        <button onclick="openManuscriptModal(${index})" class="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-[10px] font-semibold px-2 py-1 rounded transition flex items-center gap-1">
                             <i data-lucide="image" class="w-3 h-3"></i> View Graph
                         </button>
-                        <button onclick="deleteHistoryItem(${index}, event)" class="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-500/10 transition" title="Delete">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2.2 2-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        <button onclick="deleteHistoryItem(${index}, event)" class="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-500/10 transition">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                         </button>
                     </div>`;
                 listContainer.appendChild(div);
@@ -641,33 +531,29 @@
         function openManuscriptModal(index) {
             const item = savedHistory[index];
             document.getElementById('modalSpecimenTitle').textContent = `Figure: Normal-Incidence Sound Absorption Spectrum (${item.name})`;
-            document.getElementById('modalTimestamp').textContent = `Recorded: ${item.time} | Sound Speed: ${item.speedSound || '343 m/s'} | ISO 10534-2 Two-Microphone Method`;
-            
+            document.getElementById('modalTimestamp').textContent = `Recorded: ${item.time} | Sound Speed: ${item.speedSound} | ISO 10534-2 Method`;
+
             const badge = document.getElementById('modalValidityBadge');
-            if (item.valid) {
-                badge.textContent = `✓ Validated for Observation Sheet (${item.accuracy || 94}% Accuracy)`;
-                badge.className = 'text-[11px] font-bold px-3 py-1 rounded bg-emerald-100 text-emerald-800 border border-emerald-300';
-            } else {
-                badge.textContent = `⚠ Unvalidated Test Record (${item.accuracy || 70}% Accuracy)`;
-                badge.className = 'text-[11px] font-bold px-3 py-1 rounded bg-amber-100 text-amber-800 border border-amber-300';
-            }
+            badge.textContent = item.valid
+                ? `✓ Validated Hardware Measurement (${item.accuracy}% Coherence)`
+                : `⚠ Unvalidated Record (${item.accuracy}% Coherence)`;
+            badge.className = item.valid
+                ? 'text-[11px] font-bold px-3 py-1 rounded bg-emerald-100 text-emerald-800 border border-emerald-300'
+                : 'text-[11px] font-bold px-3 py-1 rounded bg-amber-100 text-amber-800 border border-amber-300';
 
             const modalTbody = document.getElementById('modalDataTable');
             modalTbody.innerHTML = '';
             TARGET_FREQ_LABELS.forEach((label, idx) => {
-                const alphaVal = item.data[idx];
                 const tr = document.createElement('tr');
                 tr.className = 'border-b border-slate-100';
-                tr.innerHTML = `<td class="p-2">${label}</td><td class="p-2 font-bold text-indigo-700">${alphaVal.toFixed(2)}</td><td class="p-2 text-right text-emerald-700 font-semibold">${item.valid ? '✓ Verified' : 'Standard'}</td>`;
+                tr.innerHTML = `<td class="p-2">${label}</td><td class="p-2 font-bold text-indigo-700">${item.data[idx].toFixed(2)}</td><td class="p-2 text-right text-emerald-700 font-semibold">${item.valid ? '✓ Verified' : 'Check'}</td>`;
                 modalTbody.appendChild(tr);
             });
 
             document.getElementById('manuscriptModal').classList.remove('hidden');
 
             const ctx = document.getElementById('manuscriptChart').getContext('2d');
-            if (manuscriptChart) {
-                manuscriptChart.destroy();
-            }
+            if (manuscriptChart) manuscriptChart.destroy();
             manuscriptChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -687,22 +573,9 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: true, position: 'top', labels: { font: { size: 11, family: 'sans-serif' }, color: '#1e293b' } }
-                    },
                     scales: {
-                        x: {
-                            grid: { color: 'rgba(226, 232, 240, 1)' },
-                            ticks: { color: '#475569', font: { size: 11 } },
-                            title: { display: true, text: 'Frequency (Hz)', color: '#1e293b', font: { weight: 'bold' } }
-                        },
-                        y: {
-                            min: 0,
-                            max: 1,
-                            grid: { color: 'rgba(226, 232, 240, 1)' },
-                            ticks: { color: '#475569', font: { size: 11 } },
-                            title: { display: true, text: 'Sound Absorption Coefficient (\u03b1)', color: '#1e293b', font: { weight: 'bold' } }
-                        }
+                        x: { grid: { color: 'rgba(226, 232, 240, 1)' }, ticks: { color: '#475569' }, title: { display: true, text: 'Frequency (Hz)', color: '#1e293b', font: { weight: 'bold' } } },
+                        y: { min: 0, max: 1, grid: { color: 'rgba(226, 232, 240, 1)' }, ticks: { color: '#475569' }, title: { display: true, text: 'Sound Absorption Coefficient (\u03b1)', color: '#1e293b', font: { weight: 'bold' } } }
                     }
                 }
             });
@@ -713,103 +586,6 @@
             if (manuscriptChart) {
                 manuscriptChart.destroy();
                 manuscriptChart = null;
-            }
-        }
-
-        // Unified Audio Playback Handler using Shared AudioContext
-        async function toggleAudioPlayback() {
-            const btn = document.getElementById('audioPlayBtn');
-            const audioEl = document.getElementById('audioElement');
-            const signalType = document.getElementById('audioSignalType').value;
-
-            if (audioEl && audioEl.src && audioEl.src !== window.location.href) {
-                if (audioEl.paused) {
-                    await audioEl.play();
-                    btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
-                    btn.classList.add('bg-amber-600', 'hover:bg-amber-500');
-                    btn.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i> Playing WAV...`;
-                } else {
-                    audioEl.pause();
-                    stopAudioPlayback();
-                }
-                if (typeof lucide !== 'undefined') lucide.createIcons();
-                return;
-            }
-
-            if (!sharedAudioCtx) {
-                sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (sharedAudioCtx.state === 'suspended') {
-                await sharedAudioCtx.resume();
-            }
-
-            if (activeNode) {
-                stopAudioPlayback();
-                return;
-            }
-
-            activeGainNode = sharedAudioCtx.createGain();
-            activeGainNode.gain.value = 0.2; 
-            activeGainNode.connect(sharedAudioCtx.destination);
-
-            if (signalType === 'whitenoise' || signalType === 'pinknoise') {
-                const bufferSize = 2 * sharedAudioCtx.sampleRate;
-                const noiseBuffer = sharedAudioCtx.createBuffer(1, bufferSize, sharedAudioCtx.sampleRate);
-                const output = noiseBuffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) {
-                    output[i] = Math.random() * 2 - 1;
-                }
-                activeNode = sharedAudioCtx.createBufferSource();
-                activeNode.buffer = noiseBuffer;
-                activeNode.loop = true;
-                activeNode.connect(activeGainNode);
-                activeNode.start();
-            } else if (signalType === 'sweep') {
-                activeNode = sharedAudioCtx.createOscillator();
-                activeNode.type = 'sine';
-                activeNode.frequency.setValueAtTime(20, sharedAudioCtx.currentTime);
-                activeNode.frequency.exponentialRampToValueAtTime(2000, sharedAudioCtx.currentTime + 5);
-                activeNode.connect(activeGainNode);
-                activeNode.start();
-            }
-
-            btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
-            btn.classList.add('bg-amber-600', 'hover:bg-amber-500');
-            btn.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i> Playing...`;
-            if (typeof lucide !== 'undefined') lucide.createIcons();
-        }
-
-        function stopAudioPlayback() {
-            if (activeNode) {
-                try {
-                    activeNode.stop();
-                    activeNode.disconnect();
-                } catch (e) {}
-                activeNode = null;
-            }
-            const audioEl = document.getElementById('audioElement');
-            if (audioEl) {
-                audioEl.pause();
-                audioEl.currentTime = 0;
-            }
-            const btn = document.getElementById('audioPlayBtn');
-            if (btn) {
-                btn.classList.remove('bg-amber-600', 'hover:bg-amber-500');
-                btn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
-                btn.innerHTML = `<i data-lucide="play" class="w-3 h-3"></i> Play Signal`;
-                if (typeof lucide !== 'undefined') lucide.createIcons();
-            }
-        }
-
-        function loadCustomAudio(event) {
-            const file = event.target.files[0];
-            if (file) {
-                const audioEl = document.getElementById('audioElement');
-                if (audioEl) {
-                    audioEl.src = URL.createObjectURL(file);
-                    audioEl.load();
-                    alert(`Successfully loaded custom audio file: ${file.name}`);
-                }
             }
         }
     </script>
