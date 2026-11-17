@@ -88,6 +88,37 @@
                     </div>
                 </div>
 
+                <!-- Test Audio Generator -->
+                <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 space-y-2">
+                    <span class="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
+                        <i data-lucide="volume-2" class="w-3 h-3 text-indigo-400"></i> Test Audio Generator
+                    </span>
+                    <div>
+                        <label for="testSignalType" class="block text-[10px] text-slate-500 mb-0.5">Signal Type</label>
+                        <select id="testSignalType" class="w-full bg-dark-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <option value="sweep">Sine Sweep (100 Hz - 2200 Hz, 5 s)</option>
+                            <option value="white">White Noise</option>
+                            <option value="pink">Pink Noise</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="testSignalGain" class="flex justify-between text-[10px] text-slate-500 mb-0.5">
+                            <span>Output Level</span>
+                            <span id="testSignalGainLabel">5%</span>
+                        </label>
+                        <input id="testSignalGain" type="range" min="0" max="30" value="5" class="w-full accent-indigo-500" oninput="updateTestSignalGain()">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="testSignalPlayBtn" onclick="startTestSignal()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold py-1.5 px-3 rounded transition">
+                            Play Signal
+                        </button>
+                        <button id="testSignalStopBtn" onclick="stopTestSignal()" disabled class="bg-rose-600/20 hover:bg-rose-600/30 disabled:opacity-40 disabled:cursor-not-allowed text-rose-400 border border-rose-500/30 text-xs font-semibold py-1.5 px-3 rounded transition">
+                            Stop
+                        </button>
+                    </div>
+                    <p id="testSignalStatus" aria-live="polite" class="text-[10px] text-slate-500">Ready. Start at a low level.</p>
+                </div>
+
                 <!-- Propagation Time & Speed of Sound -->
                 <div class="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 flex items-center justify-between">
                     <div>
@@ -234,6 +265,9 @@
         let currentTestData = [];
         let savedHistory = [];
         let lastValidationResult = { isValid: false, accuracyScore: 0 };
+        let testAudioContext = null;
+        let testAudioSource = null;
+        let testAudioGain = null;
 
         const DIST_TO_SAMPLE_L = 0.40;
         const TARGET_FREQ_LABELS = ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '1750 Hz', '2000 Hz'];
@@ -269,6 +303,134 @@
 
             document.getElementById('tof-ms').textContent = `${timeInMilliseconds.toFixed(2)} ms`;
             document.getElementById('speed-sound').textContent = `${speedOfSound.toFixed(1)} m/s`;
+        }
+
+        function updateTestSignalGain() {
+            const level = Number(document.getElementById('testSignalGain').value);
+            document.getElementById('testSignalGainLabel').textContent = `${level}%`;
+            if (testAudioGain && testAudioContext) {
+                testAudioGain.gain.setTargetAtTime(level / 100, testAudioContext.currentTime, 0.02);
+            }
+        }
+
+        function setTestSignalPlaying(playing) {
+            document.getElementById('testSignalPlayBtn').disabled = playing;
+            document.getElementById('testSignalStopBtn').disabled = !playing;
+        }
+
+        async function startTestSignal() {
+            if (testAudioSource) stopTestSignal();
+
+            const status = document.getElementById('testSignalStatus');
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) {
+                status.textContent = 'Audio playback is not supported by this browser.';
+                return;
+            }
+
+            try {
+                if (!testAudioContext || testAudioContext.state === 'closed') {
+                    testAudioContext = new AudioContextClass();
+                }
+                if (testAudioContext.state === 'suspended') await testAudioContext.resume();
+
+                const signalType = document.getElementById('testSignalType').value;
+                const now = testAudioContext.currentTime;
+                const source = signalType === 'sweep'
+                    ? testAudioContext.createOscillator()
+                    : testAudioContext.createBufferSource();
+                const gain = testAudioContext.createGain();
+                const level = Number(document.getElementById('testSignalGain').value) / 100;
+
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(level, now + 0.03);
+                gain.connect(testAudioContext.destination);
+
+                if (signalType === 'sweep') {
+                    source.type = 'sine';
+                    source.frequency.setValueAtTime(100, now);
+                    source.frequency.exponentialRampToValueAtTime(2200, now + 5);
+                    source.connect(gain);
+                    source.onended = () => finishTestSignal(source, gain, 'Sine sweep complete.');
+                    source.start(now);
+                    source.stop(now + 5);
+                    status.textContent = 'Playing 100 Hz to 2200 Hz sine sweep (5 seconds).';
+                } else {
+                    const sampleRate = testAudioContext.sampleRate;
+                    const buffer = testAudioContext.createBuffer(1, sampleRate * 2, sampleRate);
+                    const samples = buffer.getChannelData(0);
+                    let b0 = 0;
+                    let b1 = 0;
+                    let b2 = 0;
+                    let b3 = 0;
+                    let b4 = 0;
+                    let b5 = 0;
+                    let b6 = 0;
+
+                    for (let i = 0; i < samples.length; i++) {
+                        const white = Math.random() * 2 - 1;
+                        if (signalType === 'pink') {
+                            b0 = 0.99886 * b0 + white * 0.0555179;
+                            b1 = 0.99332 * b1 + white * 0.0750759;
+                            b2 = 0.96900 * b2 + white * 0.1538520;
+                            b3 = 0.86650 * b3 + white * 0.3104856;
+                            b4 = 0.55000 * b4 + white * 0.5329522;
+                            b5 = -0.7616 * b5 - white * 0.0168980;
+                            samples[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
+                            b6 = white * 0.115926;
+                        } else {
+                            samples[i] = white;
+                        }
+                    }
+
+                    source.buffer = buffer;
+                    source.loop = true;
+                    source.connect(gain);
+                    source.onended = () => finishTestSignal(source, gain, 'Test signal stopped.');
+                    source.start(now);
+                    status.textContent = `Playing ${signalType === 'pink' ? 'pink' : 'white'} noise.`;
+                }
+
+                testAudioSource = source;
+                testAudioGain = gain;
+                setTestSignalPlaying(true);
+            } catch (error) {
+                console.error('Unable to start test audio playback:', error);
+                status.textContent = `Unable to start audio playback: ${error.message}`;
+                setTestSignalPlaying(false);
+            }
+        }
+
+        function finishTestSignal(source, gain, message) {
+            source.disconnect();
+            gain.disconnect();
+            if (testAudioSource === source) {
+                testAudioSource = null;
+                testAudioGain = null;
+                setTestSignalPlaying(false);
+                document.getElementById('testSignalStatus').textContent = message;
+            }
+        }
+
+        function stopTestSignal() {
+            const source = testAudioSource;
+            const gain = testAudioGain;
+            if (!source || !testAudioContext) return;
+
+            testAudioSource = null;
+            testAudioGain = null;
+            source.onended = () => {
+                source.disconnect();
+                gain.disconnect();
+            };
+
+            const stopAt = testAudioContext.currentTime + 0.03;
+            gain.gain.cancelScheduledValues(testAudioContext.currentTime);
+            gain.gain.setValueAtTime(gain.gain.value, testAudioContext.currentTime);
+            gain.gain.linearRampToValueAtTime(0, stopAt);
+            source.stop(stopAt + 0.01);
+            setTestSignalPlaying(false);
+            document.getElementById('testSignalStatus').textContent = 'Test signal stopped.';
         }
 
         function initChart() {
@@ -309,6 +471,8 @@
         }
 
         async function runHardwareMeasurement() {
+            if (testAudioSource) stopTestSignal();
+
             const btn = document.getElementById('measureBtn');
             const specimenName = document.getElementById('specimenInput').value || '15mm Bamboo Panel';
             const temp = parseFloat(document.getElementById('roomTemp').value) || 28;
