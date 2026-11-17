@@ -80,7 +80,7 @@
                         </div>
                         <div>
                             <label class="block text-[10px] text-slate-500 mb-0.5">Thickness (mm)</label>
-                            <input type="number" id="sampleThickness" value="20" oninput="calculateDensity(); calculateTimeOfFlight(20);" class="w-full bg-dark-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <input type="number" id="sampleThickness" value="15" oninput="calculateDensity(); calculateTimeOfFlight(20);" class="w-full bg-dark-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
                         </div>
                     </div>
                     <div>
@@ -335,7 +335,7 @@
 
         function calculateTimeOfFlight(tempCelsius = 20) {
             const speedOfSound = 331.3 * Math.sqrt(1 + (tempCelsius / 273.15));
-            const sampleThicknessMm = parseFloat(document.getElementById('sampleThickness').value) || 20;
+            const sampleThicknessMm = parseFloat(document.getElementById('sampleThickness').value) || 15;
             const totalDistanceMeters = DIST_TO_SAMPLE_L + (sampleThicknessMm / 1000); 
             const timeInMilliseconds = (totalDistanceMeters / speedOfSound) * 1000;
 
@@ -560,10 +560,12 @@
         function saveCurrentTest() {
             const specimenName = document.getElementById('specimenInput').value || 'Bamboo Panel';
             const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const speedSoundVal = document.getElementById('speed-sound').textContent || '343 m/s';
             
             savedHistory.push({
                 name: specimenName,
                 time: timestamp,
+                speedSound: speedSoundVal,
                 data: [...absorptionChart.data.datasets[0].data],
                 valid: lastValidationResult.isValid,
                 accuracy: lastValidationResult.accuracyScore
@@ -600,11 +602,13 @@
                 const validTag = item.valid
                     ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 ml-1.5">VALID (${item.accuracy || 94}%)</span>`
                     : '';
+                
+                const speedTag = item.speedSound ? `<span class="text-[10px] text-indigo-400 font-mono ml-2">${item.speedSound}</span>` : '';
 
                 div.innerHTML = `
                     <div>
                         <h4 class="text-xs font-bold text-slate-200 flex items-center cursor-pointer hover:text-indigo-400" onclick="loadHistoryItem(${index})">${item.name}${validTag}</h4>
-                        <span class="text-[10px] text-slate-500">Saved at ${item.time}</span>
+                        <span class="text-[10px] text-slate-500">Saved at ${item.time}</span> ${speedTag}
                     </div>
                     <div class="flex items-center gap-1.5">
                         <button onclick="openManuscriptModal(${index})" class="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-[10px] font-semibold px-2 py-1 rounded transition flex items-center gap-1" title="View Manuscript Graph">
@@ -637,7 +641,7 @@
         function openManuscriptModal(index) {
             const item = savedHistory[index];
             document.getElementById('modalSpecimenTitle').textContent = `Figure: Normal-Incidence Sound Absorption Spectrum (${item.name})`;
-            document.getElementById('modalTimestamp').textContent = `Recorded: ${item.time} | ISO 10534-2 Two-Microphone Method`;
+            document.getElementById('modalTimestamp').textContent = `Recorded: ${item.time} | Sound Speed: ${item.speedSound || '343 m/s'} | ISO 10534-2 Two-Microphone Method`;
             
             const badge = document.getElementById('modalValidityBadge');
             if (item.valid) {
