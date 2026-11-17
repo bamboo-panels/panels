@@ -165,6 +165,7 @@
                 <button id="measureBtn" onclick="runHardwareMeasurement()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs py-2.5 rounded-lg transition shadow-md flex items-center justify-center gap-2">
                     <i data-lucide="activity" class="w-4 h-4"></i> Run Live Hardware Measurement (5s)
                 </button>
+                <p class="text-[10px] text-slate-500 text-center">Geometry: 100 mm mic spacing; Mic 2 is 270 mm from the sample. Analysis: 250–1500 Hz.</p>
             </div>
         </section>
 
@@ -269,8 +270,8 @@
         let testAudioSource = null;
         let testAudioGain = null;
 
-        const DIST_TO_SAMPLE_L = 0.40;
-        const TARGET_FREQ_LABELS = ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz', '1750 Hz', '2000 Hz'];
+        const DIST_TO_SAMPLE_L = 0.27;
+        const TARGET_FREQ_LABELS = ['250 Hz', '500 Hz', '750 Hz', '1000 Hz', '1250 Hz', '1500 Hz'];
 
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof lucide !== 'undefined') lucide.createIcons();

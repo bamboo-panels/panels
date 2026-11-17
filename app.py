@@ -10,9 +10,10 @@ CORS(app)
 # --- ISO 10534-2 HARDWARE & TUBE CONSTANTS ---
 FS = 48000                  # Sample rate (Hz)
 DURATION = 5.0              # Sweep duration (seconds)
-MIC_SPACING_S = 0.05        # 50 mm spacing between Mic 1 and Mic 2 (meters)
-DIST_TO_SAMPLE_L = 0.40     # 400 mm from Mic 2 to sample front face (meters)
-TARGET_FREQS = [250, 500, 750, 1000, 1250, 1500, 1750, 2000]
+MIC_SPACING_S = 0.10        # 100 mm spacing between Mic 1 and Mic 2 (meters)
+DIST_TO_SAMPLE_L = 0.27     # 270 mm from Mic 2 to sample front face (meters)
+# Keep target frequencies below the 10 cm spacing limit (~1.74 kHz at 28 C).
+TARGET_FREQS = [250, 500, 750, 1000, 1250, 1500]
 
 def find_bomge_device():
     """Automatically locates the Bomge USB Audio Interface if connected."""
@@ -23,7 +24,7 @@ def find_bomge_device():
             return idx
     return None  # Falls back to Windows default stereo device
 
-def generate_log_sweep(fs=48000, duration=5.0, f_start=100, f_end=2200):
+def generate_log_sweep(fs=48000, duration=5.0, f_start=100, f_end=1500):
     """Generates a phase-continuous logarithmic sine sweep."""
     t = np.linspace(0, duration, int(fs * duration), endpoint=False)
     k = (f_end / f_start) ** (1.0 / duration)
